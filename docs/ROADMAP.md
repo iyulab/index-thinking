@@ -931,13 +931,48 @@ Scope: core, parsers, storage, agents, sdk, samples
 - [x] ReasoningParserRegistry for provider/model to parser mapping
 - [x] 212 unit tests passing (141 previous + 71 parsers)
 
-### v0.4.0 Truncation Handling - NEXT
+### v0.4.0 Truncation Handling - COMPLETE ✅
+
+**Completed:**
+- [x] TruncationDetector with multi-strategy detection:
+  - Primary: ChatFinishReason.Length / provider-specific stop reasons
+  - Secondary: Unbalanced braces/brackets, incomplete code blocks (state-based)
+  - Tertiary: Mid-sentence endings (heuristic with min length threshold)
+- [x] ContentRecoveryUtils for truncated content recovery:
+  - JSON repair (add missing closures)
+  - Code block closure
+  - Clean truncation point detection
+  - Fragment combining
+- [x] ContinuationConfig for continuation behavior configuration
+- [x] 283 unit tests passing (212 previous + 71 continuation)
+
+### v0.5.0 State Storage I - COMPLETE ✅
+
+**Completed:**
+- [x] Enhanced InMemoryThinkingStateStore with TTL support:
+  - Sliding/absolute expiration modes
+  - Optional cleanup timer for expired entries
+  - InMemoryStateStoreOptions configuration record
+- [x] Implemented SqliteThinkingStateStore for persistent storage:
+  - WAL mode for improved concurrency
+  - Proper connection management for in-memory vs file-based DBs
+  - SqliteStateStoreOptions with factory methods
+- [x] Created ThinkingStateSerializer for JSON serialization:
+  - snake_case naming policy for API compatibility
+  - Base64 encoding for byte[] data (ReasoningState.Data)
+  - Custom converters for DateTimeOffset
+- [x] Added DI extensions (ServiceCollectionExtensions):
+  - AddIndexThinkingInMemoryStorage with options patterns
+  - AddIndexThinkingSqliteStorage with connection string support
+  - TryAddSingleton for conflict resolution
+- [x] 357 unit tests passing (283 previous + 74 storage)
+
+### v0.6.0 Reasoning Parsers II - NEXT
 
 **Next Steps:**
-1. Implement TruncationDetector
-2. Create ContinuationConfig
-3. Implement continuation loop with guards
-4. Create continuation prompt templates
+1. Implement Gemini parser with `thought_signature` handling
+2. Implement DeepSeek/Qwen parser for `<think>` tags
+3. Add vLLM `reasoning_format: parsed` support
 
 ---
 
