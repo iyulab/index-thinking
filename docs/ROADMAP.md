@@ -864,15 +864,33 @@ Scope: core, parsers, storage, agents, sdk, samples
 - [x] nuget.config for package sources
 - [x] Solution structure with test projects
 
-### v0.2.0 Token Management - IN PROGRESS
+### v0.2.0 Token Management - COMPLETE ✅
+
+**Completed:**
+- [x] ModelEncodingRegistry for model-to-encoding mapping
+- [x] TiktokenTokenCounter with Microsoft.ML.Tokenizers (o200k_base, cl100k_base)
+- [x] ApproximateTokenCounter with language-aware character ratio fallback
+- [x] TokenCounterChain for fallback strategy pattern
+- [x] TokenCounterFactory for counter creation based on model
+- [x] 141 unit tests passing (34 foundation + 107 tokenization)
+
+### v0.3.0 Reasoning Parsers I - COMPLETE ✅
+
+**Completed:**
+- [x] OpenAI parser models (OpenAIReasoningItem, OpenAIReasoningSummary)
+- [x] Anthropic parser models (AnthropicThinkingBlock, AnthropicRedactedThinkingBlock)
+- [x] OpenAIReasoningParser for Responses API with encrypted_content support
+- [x] AnthropicReasoningParser for Extended Thinking with signature preservation
+- [x] ReasoningParserRegistry for provider/model to parser mapping
+- [x] 212 unit tests passing (141 previous + 71 parsers)
+
+### v0.4.0 Truncation Handling - NEXT
 
 **Next Steps:**
-1. Implement ModelEncodingRegistry
-2. Implement TiktokenTokenCounter
-3. Implement ApproximateTokenCounter
-4. Implement TokenCounterChain
-5. Write comprehensive tests
-6. Run tests and commit
+1. Implement TruncationDetector
+2. Create ContinuationConfig
+3. Implement continuation loop with guards
+4. Create continuation prompt templates
 
 ---
 
