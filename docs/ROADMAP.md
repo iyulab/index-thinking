@@ -399,43 +399,148 @@ public class ThinkingStateStoreTests
 
 ---
 
-## v0.2.0 - Token Management
+## v0.2.0 - Token Management (Current Phase)
 
-**Goal**: Implement accurate token counting and intelligent budget allocation.
+**Goal**: Implement accurate token counting with fallback chain strategy.
 
-### Tasks
+### Prerequisites
+- v0.1.0 Foundation complete
+- Microsoft.ML.Tokenizers package (v1.0.2)
 
-- [ ] Implement `TokenCounterChain` with fallback strategy
-  ```csharp
-  public class TokenCounterChain : ITokenCounter
-  {
-      // 1. Model-specific tokenizer (exact)
-      // 2. Encoding-based tokenizer (tiktoken, sentencepiece)
-      // 3. Approximate counter (chars/ratio)
-  }
-  ```
+### Philosophy Alignment
+- **Single Responsibility**: Counters only count tokens; budget decisions elsewhere
+- **Fallback Chain**: Exact → Encoding-based → Approximate
+- **Provider Agnostic**: Support any model through approximation
 
-- [ ] Integrate `Microsoft.ML.Tokenizers` for OpenAI models
-  - Support `o200k_base` encoding (GPT-4o, o3, o4-mini)
-  - Support `cl100k_base` encoding (GPT-4, GPT-3.5)
+### Critical Review Notes
 
-- [ ] Implement language-aware approximate counting
-  - English: ~4 chars/token
-  - Korean/Japanese: ~1.5 chars/token
-  - Chinese: ~1.2 chars/token
+**Scope Refinement (from original plan):**
+- ✅ TokenCounterChain with fallback strategy
+- ✅ Microsoft.ML.Tokenizers integration (o200k_base, cl100k_base)
+- ✅ Language-aware approximate counting
+- ❌ ComplexityEstimator → Moved to v0.4.0 (uses counters, not part of counting)
+- ❌ BudgetAllocator → Moved to v0.4.0 (budget decisions, not counting)
+- ❌ Model token limit registry → Lives in BudgetConfig (v0.4.0)
 
-- [ ] Create `ComplexityEstimator`
-- [ ] Implement `BudgetAllocator`
-- [ ] Add model token limit registry
+**Rationale**: Token counting is infrastructure; budget allocation is a consumer.
 
-### Test Requirements
-- [ ] Token counting accuracy tests (compare with official tokenizers)
-- [ ] Language detection tests
-- [ ] Budget allocation tests with various complexity levels
+### Task Breakdown
+
+#### 1. TiktokenTokenCounter
+Exact token counting for OpenAI models.
+
+```csharp
+public sealed class TiktokenTokenCounter : ITokenCounter
+{
+    private readonly TiktokenTokenizer _tokenizer;
+    private const int MessageOverhead = 4; // role + formatting
+
+    public int Count(string text) => _tokenizer.CountTokens(text);
+    public int Count(ChatMessage message) => Count(message.Text ?? "") + MessageOverhead;
+    public bool SupportsModel(string modelId) => ModelEncodingRegistry.IsOpenAIModel(modelId);
+}
+```
+
+**Test Cases:**
+- `Count_EmptyString_ReturnsZero`
+- `Count_HelloWorld_Returns2Tokens` (verified with official tiktoken)
+- `Count_KoreanText_ReturnsExpectedTokens`
+- `Count_ChatMessage_IncludesRoleOverhead`
+- `SupportsModel_Gpt4o_ReturnsTrue`
+- `SupportsModel_Claude_ReturnsFalse`
+
+#### 2. ApproximateTokenCounter
+Fallback counter using character/token ratios.
+
+```csharp
+public sealed class ApproximateTokenCounter : ITokenCounter
+{
+    public record LanguageRatios(
+        double English = 4.0,    // ~4 chars/token
+        double Korean = 1.5,     // More tokens per char
+        double Chinese = 1.2,
+        double Default = 3.5);   // Conservative
+
+    public bool SupportsModel(string modelId) => true; // Always fallback
+}
+```
+
+**Test Cases:**
+- `Count_EnglishText_ReturnsApproximateTokens`
+- `Count_KoreanText_ReturnsHigherTokenCount`
+- `Count_MixedLanguage_UsesBlendedRatio`
+- `SupportsModel_AnyModel_ReturnsTrue`
+
+#### 3. TokenCounterChain
+Try counters in order until one supports the model.
+
+```csharp
+public sealed class TokenCounterChain : ITokenCounter
+{
+    private readonly IReadOnlyList<ITokenCounter> _counters;
+    private string? _currentModelId;
+
+    public TokenCounterChain WithModel(string modelId);
+}
+```
+
+**Test Cases:**
+- `Count_WithSupportedModel_UsesFirstMatch`
+- `Count_WithUnsupportedModel_UsesFallback`
+- `Chain_EmptyCounters_Throws`
+
+#### 4. ModelEncodingRegistry
+Map model IDs to tiktoken encodings.
+
+```csharp
+public static class ModelEncodingRegistry
+{
+    // o200k_base: gpt-4o, o1, o3, o4-mini
+    // cl100k_base: gpt-4, gpt-3.5-turbo
+    public static string? GetEncoding(string modelId);
+    public static bool IsOpenAIModel(string modelId);
+}
+```
+
+**Test Cases:**
+- `GetEncoding_Gpt4o_ReturnsO200kBase`
+- `GetEncoding_Gpt4_ReturnsCl100kBase`
+- `GetEncoding_Claude_ReturnsNull`
+- `IsOpenAIModel_Gpt4o_ReturnsTrue`
+
+#### 5. TokenCounterFactory
+Create appropriate counter for a model.
+
+**Test Cases:**
+- `Create_WithGpt4o_ReturnsTiktokenFirst`
+- `Create_WithClaude_ReturnsApproximateOnly`
+- `Create_WithNull_ReturnsDefaultChain`
+
+### Verification Criteria
+
+| Criteria | Method |
+|----------|--------|
+| Tiktoken accuracy | 0% difference from Python tiktoken |
+| Approximate accuracy | Within ±20% of exact |
+| All tests pass | `dotnet test` succeeds |
+| Code coverage | >90% on new code |
+
+### Project Structure
+
+```
+src/IndexThinking/Tokenization/
+├── TiktokenTokenCounter.cs
+├── ApproximateTokenCounter.cs
+├── TokenCounterChain.cs
+├── TokenCounterFactory.cs
+├── ModelEncodingRegistry.cs
+└── LanguageRatios.cs
+```
 
 ### Deliverables
-- `IndexThinking.Tokenization` namespace
+- `IndexThinking.Tokenization` namespace with full implementation
 - Unit tests with >90% coverage
+- Verified against official tiktoken
 
 ---
 
@@ -748,22 +853,26 @@ Scope: core, parsers, storage, agents, sdk, samples
 
 ## Current Phase Status
 
-### v0.1.0 Foundation - IN PROGRESS
+### v0.1.0 Foundation - COMPLETE ✅
 
 **Completed:**
-- [x] Project structure defined
-- [x] Interface design finalized
+- [x] Project structure with Directory.Build.props, Directory.Packages.props
+- [x] Core interfaces: IReasoningParser, IThinkingStateStore, ITruncationDetector, ITokenCounter
+- [x] Core records: ThinkingContent, ReasoningState, ThinkingState, BudgetConfig, TruncationInfo
+- [x] InMemoryThinkingStateStore implementation
+- [x] 34 unit tests passing
+- [x] nuget.config for package sources
+- [x] Solution structure with test projects
 
-**In Progress:**
-- [ ] Test project setup
-- [ ] Core interface implementation
+### v0.2.0 Token Management - IN PROGRESS
 
 **Next Steps:**
-1. Create test project with xUnit
-2. Implement interfaces with XML docs
-3. Create record types
-4. Write unit tests
-5. Run tests and commit
+1. Implement ModelEncodingRegistry
+2. Implement TiktokenTokenCounter
+3. Implement ApproximateTokenCounter
+4. Implement TokenCounterChain
+5. Write comprehensive tests
+6. Run tests and commit
 
 ---
 

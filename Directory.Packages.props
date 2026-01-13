@@ -11,6 +11,8 @@
 
     <!-- Tokenization -->
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="1.0.2" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="1.0.2" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="1.0.2" />
 
     <!-- Testing -->
     <PackageVersion Include="xunit" Version="2.9.3" />
