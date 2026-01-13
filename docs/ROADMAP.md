@@ -675,22 +675,27 @@ src/IndexThinking/Tokenization/
 
 ---
 
-## v0.7.0 - Agent Framework
+## v0.7.0 - Internal Thinking Agents
 
-**Goal**: Implement internal agent system for complex task orchestration.
+**Goal**: Implement internal agents for single-turn thinking optimization.
+
+> **IMPORTANT**: These are NOT external agent orchestrators (like AutoGen, LangGraph).
+> These are internal components that optimize a SINGLE LLM turn's thinking process.
+> See "Scope Boundaries" in Philosophy section.
 
 ### Tasks
-- [ ] Define `IThinkingAgent` interface
-- [ ] Implement core agents (Budget, Continuation, Decomposer)
-- [ ] Create `ThinkingOrchestrator`
-- [ ] Implement task decomposition strategies
+- [ ] Define `IThinkingAgent` interface (internal optimization agent)
+- [ ] Implement `BudgetAgent` - manages token allocation within a turn
+- [ ] Implement `ContinuationAgent` - handles response continuation seamlessly
+- [ ] Implement `ThinkingPhaseManager` - coordinates internal agents for one turn
+- [ ] Implement thinking complexity estimation
 
 ### Test Requirements
 - [ ] Agent unit tests
-- [ ] Orchestrator integration tests
+- [ ] Turn manager integration tests
 
 ### Deliverables
-- `IndexThinking.Agents` namespace
+- `IndexThinking.Agents` namespace (internal optimization, NOT external orchestration)
 
 ---
 
