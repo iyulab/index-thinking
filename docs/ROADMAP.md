@@ -16,6 +16,48 @@ This roadmap outlines the incremental development strategy for IndexThinking, a 
 4. **Test-First Development**: Every feature has tests before implementation
 5. **Provider Agnostic**: Parse reasoning output, don't couple to specific APIs
 
+### Scope Boundaries: IndexThinking vs Agent Orchestration
+
+**IndexThinking는 Agent Orchestration이 아닙니다.** 이 구분은 프로젝트 철학의 핵심입니다.
+
+| Aspect | IndexThinking | Agent Orchestration |
+|--------|---------------|---------------------|
+| **Focus** | Single LLM turn optimization | Multi-agent/multi-step coordination |
+| **Responsibility** | Reasoning parsing, token management, truncation handling | Task routing, tool management, workflow control |
+| **Input** | One LLM request/response pair | Complex task requiring multiple LLM calls |
+| **Output** | Optimized thinking content + state | Task completion across multiple agents |
+| **State Scope** | Within a turn (thinking state) | Across conversation/workflow |
+| **Integration Point** | Middleware in IChatClient pipeline | Consumes IndexThinking as a building block |
+
+**IndexThinking이 하는 것:**
+- LLM 응답에서 thinking/reasoning 콘텐츠 파싱
+- 토큰 예산 관리 및 비용 추적
+- 응답 truncation 감지 및 복구
+- Provider별 reasoning 상태 보존 (signatures, encrypted_content)
+
+**IndexThinking이 하지 않는 것:**
+- 태스크를 여러 LLM 호출로 분해
+- 여러 에이전트 간 작업 라우팅
+- 도구/함수 호출 조율
+- 워크플로우 상태 관리
+
+**관계 예시:**
+```
+┌─────────────────────────────────────────────────┐
+│           Agent Orchestrator                    │
+│  (AutoGen, Semantic Kernel, LangGraph, etc.)    │
+├─────────────────────────────────────────────────┤
+│  Task 1          Task 2          Task 3         │
+│    ↓                ↓                ↓          │
+│ ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│ │ IChatClient │→│ IChatClient │→│ IChatClient │  │
+│ │ + IndexThinking │  │ + IndexThinking │  │ + IndexThinking │  │
+│ └──────────┘  └──────────┘  └──────────┘       │
+└─────────────────────────────────────────────────┘
+```
+
+IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building block**입니다.
+
 ### Architecture Decision Records
 
 | Decision | Rationale |
