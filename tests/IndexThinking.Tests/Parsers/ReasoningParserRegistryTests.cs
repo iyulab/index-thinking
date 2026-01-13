@@ -39,6 +39,34 @@ public class ReasoningParserRegistryTests
     }
 
     [Fact]
+    public void Default_ContainsGeminiParser()
+    {
+        // Arrange
+        var registry = ReasoningParserRegistry.Default;
+
+        // Act
+        var parser = registry.GetByProvider("gemini");
+
+        // Assert
+        parser.Should().NotBeNull();
+        parser.Should().BeOfType<GeminiReasoningParser>();
+    }
+
+    [Fact]
+    public void Default_ContainsOpenSourceParser()
+    {
+        // Arrange
+        var registry = ReasoningParserRegistry.Default;
+
+        // Act
+        var parser = registry.GetByProvider("opensource");
+
+        // Assert
+        parser.Should().NotBeNull();
+        parser.Should().BeOfType<OpenSourceReasoningParser>();
+    }
+
+    [Fact]
     public void Register_CustomParser_CanBeRetrieved()
     {
         // Arrange
@@ -110,6 +138,15 @@ public class ReasoningParserRegistryTests
     [InlineData("claude-3-opus", "anthropic")]
     [InlineData("claude-3.5-sonnet", "anthropic")]
     [InlineData("claude-sonnet-4", "anthropic")]
+    [InlineData("gemini-pro", "gemini")]
+    [InlineData("gemini-1.5-flash", "gemini")]
+    [InlineData("gemini-2.5-pro", "gemini")]
+    [InlineData("models/gemini-pro", "gemini")]
+    [InlineData("deepseek-r1", "opensource")]
+    [InlineData("deepseek-coder", "opensource")]
+    [InlineData("qwen-2.5", "opensource")]
+    [InlineData("qwq-32b", "opensource")]
+    [InlineData("glm-4", "opensource")]
     public void GetByModel_KnownModels_ReturnsCorrectParser(string modelId, string expectedProvider)
     {
         // Arrange
@@ -124,9 +161,8 @@ public class ReasoningParserRegistryTests
     }
 
     [Theory]
-    [InlineData("gemini-pro")]
-    [InlineData("deepseek-coder")]
     [InlineData("llama-3")]
+    [InlineData("mistral-7b")]
     [InlineData("unknown-model")]
     public void GetByModel_UnknownModels_ReturnsNull(string modelId)
     {
@@ -287,6 +323,9 @@ public class ReasoningParserRegistryTests
     [InlineData("gpt-4o", "openai")]
     [InlineData("claude-3-opus", "anthropic")]
     [InlineData("o1-mini", "openai")]
+    [InlineData("gemini-pro", "gemini")]
+    [InlineData("deepseek-r1", "opensource")]
+    [InlineData("qwen-2.5", "opensource")]
     public void DetectProvider_KnownModels_ReturnsProvider(string modelId, string expectedProvider)
     {
         // Arrange
@@ -327,6 +366,8 @@ public class ReasoningParserRegistryTests
         // Assert
         providers.Should().Contain("openai");
         providers.Should().Contain("anthropic");
+        providers.Should().Contain("gemini");
+        providers.Should().Contain("opensource");
     }
 
     [Fact]
@@ -341,6 +382,9 @@ public class ReasoningParserRegistryTests
         // Assert
         prefixes.Should().Contain(p => p.Prefix == "gpt-" && p.Provider == "openai");
         prefixes.Should().Contain(p => p.Prefix == "claude" && p.Provider == "anthropic");
+        prefixes.Should().Contain(p => p.Prefix == "gemini" && p.Provider == "gemini");
+        prefixes.Should().Contain(p => p.Prefix == "deepseek" && p.Provider == "opensource");
+        prefixes.Should().Contain(p => p.Prefix == "qwen" && p.Provider == "opensource");
     }
 
     [Fact]

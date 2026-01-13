@@ -50,6 +50,20 @@ public sealed class ReasoningParserRegistry
         registry.Register(anthropicParser);
         registry.RegisterModelPrefix("claude", AnthropicReasoningParser.Provider);
 
+        // Register Gemini parser
+        var geminiParser = new GeminiReasoningParser();
+        registry.Register(geminiParser);
+        registry.RegisterModelPrefix("gemini", GeminiReasoningParser.Provider);
+        registry.RegisterModelPrefix("models/gemini", GeminiReasoningParser.Provider);
+
+        // Register OpenSource parser (DeepSeek, Qwen, vLLM, etc.)
+        var openSourceParser = new OpenSourceReasoningParser();
+        registry.Register(openSourceParser);
+        registry.RegisterModelPrefix("deepseek", OpenSourceReasoningParser.Provider);
+        registry.RegisterModelPrefix("qwen", OpenSourceReasoningParser.Provider);
+        registry.RegisterModelPrefix("qwq", OpenSourceReasoningParser.Provider);
+        registry.RegisterModelPrefix("glm", OpenSourceReasoningParser.Provider);
+
         return registry;
     }
 

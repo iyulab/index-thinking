@@ -967,12 +967,31 @@ Scope: core, parsers, storage, agents, sdk, samples
   - TryAddSingleton for conflict resolution
 - [x] 357 unit tests passing (283 previous + 74 storage)
 
-### v0.6.0 Reasoning Parsers II - NEXT
+### v0.6.0 Reasoning Parsers II - COMPLETE ✅
+
+**Completed:**
+- [x] GeminiReasoningParser with `thoughtSignature` handling:
+  - Native Gemini API format (`thoughtSignature` in content parts)
+  - OpenAI-compatible format (`extra_content.google.thought_signature`)
+  - Thought content extraction and combination
+  - Thinking token count extraction
+- [x] OpenSourceReasoningParser for DeepSeek/Qwen/vLLM:
+  - Structured `reasoning_content` field parsing
+  - `<think>...</think>` tag extraction from content
+  - vLLM `reasoning` field support
+  - Configurable think tag delimiters
+- [x] Updated ReasoningParserRegistry with new parsers:
+  - Gemini model prefixes (gemini, models/gemini)
+  - OpenSource model prefixes (deepseek, qwen, qwq, glm)
+- [x] 418 unit tests passing (357 previous + 61 new parsers)
+
+### v0.7.0 Internal Thinking Agents - NEXT
 
 **Next Steps:**
-1. Implement Gemini parser with `thought_signature` handling
-2. Implement DeepSeek/Qwen parser for `<think>` tags
-3. Add vLLM `reasoning_format: parsed` support
+1. Define `IThinkingAgent` interface (internal optimization agent)
+2. Implement `BudgetAgent` - manages token allocation within a turn
+3. Implement `ContinuationAgent` - handles response continuation
+4. Implement `ThinkingPhaseManager` - coordinates internal agents
 
 ---
 
