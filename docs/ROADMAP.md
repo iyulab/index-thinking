@@ -677,25 +677,490 @@ src/IndexThinking/Tokenization/
 
 ## v0.7.0 - Internal Thinking Agents
 
-**Goal**: Implement internal agents for single-turn thinking optimization.
+**Goal**: Implement internal components for single-turn thinking optimization.
 
 > **IMPORTANT**: These are NOT external agent orchestrators (like AutoGen, LangGraph).
 > These are internal components that optimize a SINGLE LLM turn's thinking process.
 > See "Scope Boundaries" in Philosophy section.
 
-### Tasks
-- [ ] Define `IThinkingAgent` interface (internal optimization agent)
-- [ ] Implement `BudgetAgent` - manages token allocation within a turn
-- [ ] Implement `ContinuationAgent` - handles response continuation seamlessly
-- [ ] Implement `ThinkingPhaseManager` - coordinates internal agents for one turn
-- [ ] Implement thinking complexity estimation
+### Prerequisites
+- v0.6.0 Reasoning Parsers II complete
+- Understanding of existing components:
+  - `ITokenCounter` / `TokenCounterChain` (v0.2.0)
+  - `ITruncationDetector` / `TruncationDetector` (v0.4.0)
+  - `ContentRecoveryUtils` (v0.4.0)
+  - `ContinuationConfig` (v0.4.0)
+  - `BudgetConfig`, `TaskComplexity` (v0.1.0)
 
-### Test Requirements
-- [ ] Agent unit tests
-- [ ] Turn manager integration tests
+### Philosophy Alignment
+
+**Research Foundation:**
+- [TALE (Token-Budget-Aware LLM Reasoning)](https://arxiv.org/abs/2412.18547) - ACL 2025
+- [SelfBudgeter](https://arxiv.org/abs/2505.11274) - Adaptive token allocation
+- [Reasoning on a Budget Survey](https://arxiv.org/abs/2507.02076) - Adaptive test-time compute
+
+**Key Principles from Research:**
+1. **Budget is Advisory, Not Enforced** - TALE shows over-constraint causes "Token Elasticity" issues
+2. **Complexity-Based Allocation** - Different tasks need different budgets (TALE-EP approach)
+3. **State Machine Continuation** - Iterate until `finish_reason != "length"` (best practice)
+4. **Progress Tracking** - Prevent infinite loops with minimum progress thresholds
+
+**What v0.7.0 Does:**
+- Compose existing components into cohesive turn management
+- Estimate task complexity for budget recommendations
+- Manage continuation loop with guards
+- Track turn-level metrics (tokens, continuations, duration)
+
+**What v0.7.0 Does NOT Do:**
+- Train or fine-tune models (that's TALE-PT/SelfBudgeter territory)
+- Route between multiple LLM calls (that's Agent Orchestration)
+- Inject budget into model prompts (consumer's responsibility)
+
+### Task Breakdown
+
+#### 1. Core Types
+
+##### ThinkingContext
+```csharp
+/// <summary>
+/// Contextual information for a single thinking turn.
+/// Passed between internal components during turn processing.
+/// </summary>
+public sealed record ThinkingContext
+{
+    /// <summary>Unique identifier for this turn.</summary>
+    public required string TurnId { get; init; }
+
+    /// <summary>Session identifier for state correlation.</summary>
+    public required string SessionId { get; init; }
+
+    /// <summary>The original user request.</summary>
+    public required IList<ChatMessage> Messages { get; init; }
+
+    /// <summary>Budget configuration for this turn.</summary>
+    public BudgetConfig Budget { get; init; } = new();
+
+    /// <summary>Continuation configuration.</summary>
+    public ContinuationConfig Continuation { get; init; } = ContinuationConfig.Default;
+
+    /// <summary>Estimated task complexity.</summary>
+    public TaskComplexity? EstimatedComplexity { get; init; }
+
+    /// <summary>Model identifier (if known).</summary>
+    public string? ModelId { get; init; }
+
+    /// <summary>When this turn started.</summary>
+    public DateTimeOffset StartedAt { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Cancellation token for this turn.</summary>
+    public CancellationToken CancellationToken { get; init; }
+}
+```
+
+##### TurnResult
+```csharp
+/// <summary>
+/// Result of a completed thinking turn.
+/// </summary>
+public sealed record TurnResult
+{
+    /// <summary>The final (possibly combined) response.</summary>
+    public required ChatResponse Response { get; init; }
+
+    /// <summary>Parsed thinking content, if any.</summary>
+    public ThinkingContent? ThinkingContent { get; init; }
+
+    /// <summary>Provider-specific reasoning state.</summary>
+    public ReasoningState? ReasoningState { get; init; }
+
+    /// <summary>Metrics for this turn.</summary>
+    public required TurnMetrics Metrics { get; init; }
+
+    /// <summary>Whether continuation was needed.</summary>
+    public bool WasContinued => Metrics.ContinuationCount > 0;
+
+    /// <summary>Whether the response was truncated (max continuations reached).</summary>
+    public bool WasTruncated { get; init; }
+}
+
+/// <summary>
+/// Metrics collected during a thinking turn.
+/// </summary>
+public sealed record TurnMetrics
+{
+    public int InputTokens { get; init; }
+    public int ThinkingTokens { get; init; }
+    public int OutputTokens { get; init; }
+    public int ContinuationCount { get; init; }
+    public TimeSpan Duration { get; init; }
+    public TaskComplexity? DetectedComplexity { get; init; }
+}
+```
+
+**Test Cases:**
+- [ ] `ThinkingContext_Defaults_AreReasonable`
+- [ ] `TurnResult_WasContinued_ReflectsContinuationCount`
+- [ ] `TurnMetrics_Serialization_RoundTrips`
+
+#### 2. Complexity Estimator
+
+##### IComplexityEstimator
+```csharp
+/// <summary>
+/// Estimates task complexity from input messages.
+/// Used to recommend appropriate token budgets.
+/// </summary>
+public interface IComplexityEstimator
+{
+    /// <summary>
+    /// Estimates the complexity of a task based on input messages.
+    /// </summary>
+    TaskComplexity Estimate(IReadOnlyList<ChatMessage> messages);
+
+    /// <summary>
+    /// Gets recommended budget for a given complexity level.
+    /// </summary>
+    BudgetConfig GetRecommendedBudget(TaskComplexity complexity);
+}
+```
+
+##### HeuristicComplexityEstimator
+Heuristic-based estimator using:
+- Message length and count
+- Keyword detection (debug, analyze, research, explain, etc.)
+- Code block presence
+- Question complexity markers
+
+```csharp
+public sealed class HeuristicComplexityEstimator : IComplexityEstimator
+{
+    private readonly ITokenCounter _tokenCounter;
+
+    // Complexity signals
+    private static readonly string[] ResearchKeywords =
+        ["research", "investigate", "comprehensive", "in-depth", "analyze thoroughly"];
+    private static readonly string[] ComplexKeywords =
+        ["debug", "fix", "refactor", "optimize", "implement", "design"];
+    private static readonly string[] ModerateKeywords =
+        ["explain", "summarize", "describe", "compare", "list"];
+}
+```
+
+**Test Cases:**
+- [ ] `Estimate_ShortFactualQuestion_ReturnsSimple`
+- [ ] `Estimate_CodeWithDebugKeyword_ReturnsComplex`
+- [ ] `Estimate_ResearchQuestion_ReturnsResearch`
+- [ ] `Estimate_ModerateLengthExplanation_ReturnsModerate`
+- [ ] `GetRecommendedBudget_Simple_ReturnsSmallBudget`
+- [ ] `GetRecommendedBudget_Research_ReturnsLargeBudget`
+
+#### 3. Continuation Handler
+
+##### IContinuationHandler
+```csharp
+/// <summary>
+/// Handles response continuation when truncation is detected.
+/// </summary>
+public interface IContinuationHandler
+{
+    /// <summary>
+    /// Processes a response and continues if truncated.
+    /// </summary>
+    /// <param name="context">The thinking context.</param>
+    /// <param name="initialResponse">The initial (possibly truncated) response.</param>
+    /// <param name="sendRequest">Function to send continuation requests.</param>
+    /// <returns>The final combined response with metrics.</returns>
+    Task<ContinuationResult> HandleAsync(
+        ThinkingContext context,
+        ChatResponse initialResponse,
+        Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>> sendRequest);
+}
+
+/// <summary>
+/// Result of continuation handling.
+/// </summary>
+public sealed record ContinuationResult
+{
+    public required ChatResponse FinalResponse { get; init; }
+    public required int ContinuationCount { get; init; }
+    public required bool ReachedMaxContinuations { get; init; }
+    public IReadOnlyList<ChatResponse> IntermediateResponses { get; init; } = [];
+}
+```
+
+##### DefaultContinuationHandler
+Implements state-machine pattern:
+1. Check if response is truncated (via ITruncationDetector)
+2. If not truncated, return immediately
+3. If truncated, apply recovery (via ContentRecoveryUtils)
+4. Build continuation request with previous response
+5. Loop until complete or max continuations reached
+6. Combine fragments into final response
+
+```csharp
+public sealed class DefaultContinuationHandler : IContinuationHandler
+{
+    private readonly ITruncationDetector _truncationDetector;
+    private readonly ILogger<DefaultContinuationHandler>? _logger;
+
+    // Uses ContinuationConfig from context
+    // Tracks progress to prevent infinite loops
+    // Combines fragments using ContentRecoveryUtils
+}
+```
+
+**Test Cases:**
+- [ ] `HandleAsync_NotTruncated_ReturnsImmediately`
+- [ ] `HandleAsync_TruncatedOnce_ContinuesAndCombines`
+- [ ] `HandleAsync_MultipleTruncations_ContinuesUntilComplete`
+- [ ] `HandleAsync_MaxContinuationsReached_StopsAndReturnsPartial`
+- [ ] `HandleAsync_NoProgress_StopsEarly`
+- [ ] `HandleAsync_Cancelled_ThrowsOperationCancelled`
+- [ ] `HandleAsync_JsonTruncated_RecoveryApplied`
+
+#### 4. Budget Tracker
+
+##### IBudgetTracker
+```csharp
+/// <summary>
+/// Tracks token usage within a thinking turn.
+/// Advisory only - does not enforce limits.
+/// </summary>
+public interface IBudgetTracker
+{
+    /// <summary>Records tokens from a response.</summary>
+    void RecordResponse(ChatResponse response, ThinkingContent? thinking);
+
+    /// <summary>Gets current usage metrics.</summary>
+    BudgetUsage GetUsage();
+
+    /// <summary>Checks if thinking budget is exceeded (advisory).</summary>
+    bool IsThinkingBudgetExceeded(BudgetConfig config);
+
+    /// <summary>Checks if answer budget is exceeded (advisory).</summary>
+    bool IsAnswerBudgetExceeded(BudgetConfig config);
+}
+
+/// <summary>
+/// Current budget usage within a turn.
+/// </summary>
+public sealed record BudgetUsage
+{
+    public int InputTokens { get; init; }
+    public int ThinkingTokens { get; init; }
+    public int OutputTokens { get; init; }
+    public int TotalTokens => InputTokens + ThinkingTokens + OutputTokens;
+}
+```
+
+##### DefaultBudgetTracker
+```csharp
+public sealed class DefaultBudgetTracker : IBudgetTracker
+{
+    private readonly ITokenCounter _tokenCounter;
+    private int _inputTokens;
+    private int _thinkingTokens;
+    private int _outputTokens;
+
+    // Thread-safe accumulation
+    // Extracts token counts from response.Usage if available
+    // Falls back to ITokenCounter for estimation
+}
+```
+
+**Test Cases:**
+- [ ] `RecordResponse_WithUsageMetadata_UsesActualCounts`
+- [ ] `RecordResponse_WithoutUsage_EstimatesTokens`
+- [ ] `GetUsage_AfterMultipleResponses_AccumulatesCorrectly`
+- [ ] `IsThinkingBudgetExceeded_UnderBudget_ReturnsFalse`
+- [ ] `IsThinkingBudgetExceeded_OverBudget_ReturnsTrue`
+
+#### 5. Turn Manager
+
+##### IThinkingTurnManager
+```csharp
+/// <summary>
+/// Coordinates a single thinking turn from request to result.
+/// This is the main entry point for turn-level processing.
+/// </summary>
+public interface IThinkingTurnManager
+{
+    /// <summary>
+    /// Processes a complete thinking turn.
+    /// </summary>
+    /// <param name="context">The thinking context.</param>
+    /// <param name="sendRequest">Function to send requests to the LLM.</param>
+    /// <returns>The turn result with response and metrics.</returns>
+    Task<TurnResult> ProcessTurnAsync(
+        ThinkingContext context,
+        Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>> sendRequest);
+}
+```
+
+##### DefaultThinkingTurnManager
+Orchestrates all components:
+1. Estimate complexity (if not provided)
+2. Send initial request
+3. Parse reasoning content
+4. Handle continuation if needed
+5. Track budget usage
+6. Store state (via IThinkingStateStore)
+7. Return combined result
+
+```csharp
+public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
+{
+    private readonly IComplexityEstimator _complexityEstimator;
+    private readonly IContinuationHandler _continuationHandler;
+    private readonly IReasoningParser[] _parsers;
+    private readonly IThinkingStateStore _stateStore;
+    private readonly ILogger<DefaultThinkingTurnManager>? _logger;
+
+    public async Task<TurnResult> ProcessTurnAsync(...)
+    {
+        // 1. Estimate complexity
+        var complexity = context.EstimatedComplexity
+            ?? _complexityEstimator.Estimate(context.Messages);
+
+        // 2. Create budget tracker
+        var budgetTracker = new DefaultBudgetTracker(_tokenCounter);
+
+        // 3. Send initial request
+        var response = await sendRequest(context.Messages, context.CancellationToken);
+
+        // 4. Handle continuation if needed
+        var continuationResult = await _continuationHandler.HandleAsync(
+            context, response, sendRequest);
+
+        // 5. Parse reasoning from final response
+        var (thinkingContent, reasoningState) = ParseReasoning(continuationResult.FinalResponse);
+
+        // 6. Record final metrics
+        budgetTracker.RecordResponse(continuationResult.FinalResponse, thinkingContent);
+
+        // 7. Store state
+        await StoreStateAsync(context, budgetTracker, continuationResult);
+
+        // 8. Return result
+        return new TurnResult { ... };
+    }
+}
+```
+
+**Test Cases:**
+- [ ] `ProcessTurnAsync_SimpleRequest_CompletesWithoutContinuation`
+- [ ] `ProcessTurnAsync_TruncatedResponse_ContinuesSuccessfully`
+- [ ] `ProcessTurnAsync_WithThinkingContent_ParsesCorrectly`
+- [ ] `ProcessTurnAsync_StoresState_InStateStore`
+- [ ] `ProcessTurnAsync_TracksMetrics_Accurately`
+- [ ] `ProcessTurnAsync_Cancelled_ThrowsAndCleansUp`
+
+#### 6. DI Extensions
+
+```csharp
+public static class AgentServiceCollectionExtensions
+{
+    /// <summary>
+    /// Adds IndexThinking turn management services.
+    /// </summary>
+    public static IServiceCollection AddIndexThinkingAgents(
+        this IServiceCollection services,
+        Action<AgentOptions>? configure = null)
+    {
+        services.TryAddSingleton<IComplexityEstimator, HeuristicComplexityEstimator>();
+        services.TryAddSingleton<IContinuationHandler, DefaultContinuationHandler>();
+        services.TryAddSingleton<IThinkingTurnManager, DefaultThinkingTurnManager>();
+
+        // Configure options
+        if (configure is not null)
+        {
+            services.Configure(configure);
+        }
+
+        return services;
+    }
+}
+
+public sealed class AgentOptions
+{
+    /// <summary>Default budget configuration.</summary>
+    public BudgetConfig DefaultBudget { get; set; } = new();
+
+    /// <summary>Default continuation configuration.</summary>
+    public ContinuationConfig DefaultContinuation { get; set; } = ContinuationConfig.Default;
+
+    /// <summary>Whether to auto-estimate complexity.</summary>
+    public bool AutoEstimateComplexity { get; set; } = true;
+}
+```
+
+**Test Cases:**
+- [ ] `AddIndexThinkingAgents_RegistersAllServices`
+- [ ] `AddIndexThinkingAgents_WithOptions_AppliesConfiguration`
+- [ ] `Services_ResolveCorrectly_FromDI`
+
+### Project Structure
+
+```
+src/IndexThinking/
+├── Agents/
+│   ├── IComplexityEstimator.cs
+│   ├── HeuristicComplexityEstimator.cs
+│   ├── IContinuationHandler.cs
+│   ├── DefaultContinuationHandler.cs
+│   ├── IBudgetTracker.cs
+│   ├── DefaultBudgetTracker.cs
+│   ├── IThinkingTurnManager.cs
+│   ├── DefaultThinkingTurnManager.cs
+│   ├── ThinkingContext.cs
+│   ├── TurnResult.cs
+│   └── AgentOptions.cs
+├── Extensions/
+│   └── AgentServiceCollectionExtensions.cs (new)
+```
+
+### Verification Criteria
+
+| Criteria | Method |
+|----------|--------|
+| All interfaces compile | `dotnet build` succeeds |
+| Unit tests pass | `dotnet test` succeeds |
+| Code coverage | >85% on new code |
+| Integration with existing components | Uses ITruncationDetector, ITokenCounter, etc. |
+| No breaking changes | Existing APIs unchanged |
+
+### Test Summary
+
+| Component | Test Count | Coverage Target |
+|-----------|------------|-----------------|
+| ThinkingContext/TurnResult | 5 | Records, serialization |
+| HeuristicComplexityEstimator | 6 | All complexity levels |
+| DefaultContinuationHandler | 7 | All continuation scenarios |
+| DefaultBudgetTracker | 5 | Token tracking |
+| DefaultThinkingTurnManager | 6 | Full turn processing |
+| DI Extensions | 3 | Service registration |
+| **Total** | **32+** | **>85%** |
 
 ### Deliverables
-- `IndexThinking.Agents` namespace (internal optimization, NOT external orchestration)
+
+| Deliverable | Location | Verification |
+|-------------|----------|--------------|
+| Core types | `src/IndexThinking/Agents/` | Compiles |
+| Complexity estimator | `src/IndexThinking/Agents/` | Unit tests |
+| Continuation handler | `src/IndexThinking/Agents/` | Unit tests |
+| Budget tracker | `src/IndexThinking/Agents/` | Unit tests |
+| Turn manager | `src/IndexThinking/Agents/` | Integration tests |
+| DI extensions | `src/IndexThinking/Extensions/` | Unit tests |
+| Test suite | `tests/IndexThinking.Tests/Agents/` | All green |
+
+### Acceptance Criteria
+
+- [ ] `dotnet build IndexThinking.sln` succeeds with no warnings
+- [ ] `dotnet test` runs all tests successfully (450+ tests expected)
+- [ ] Code coverage >85% on new code
+- [ ] No TODO comments in committed code
+- [ ] All public types have XML documentation
+- [ ] Existing v0.1-v0.6 tests still pass
 
 ---
 
@@ -987,11 +1452,29 @@ Scope: core, parsers, storage, agents, sdk, samples
 
 ### v0.7.0 Internal Thinking Agents - NEXT
 
-**Next Steps:**
-1. Define `IThinkingAgent` interface (internal optimization agent)
-2. Implement `BudgetAgent` - manages token allocation within a turn
-3. Implement `ContinuationAgent` - handles response continuation
-4. Implement `ThinkingPhaseManager` - coordinates internal agents
+**Scope**: Single-turn thinking optimization (NOT Agent Orchestration)
+
+**Components to Implement** (32+ tests planned):
+
+| Component | Interface | Implementation | Purpose |
+|-----------|-----------|----------------|---------|
+| Core Types | - | `ThinkingContext`, `TurnResult`, `TurnMetrics` | Turn-level data structures |
+| Complexity Estimator | `IComplexityEstimator` | `HeuristicComplexityEstimator` | TALE-inspired budget recommendation |
+| Continuation Handler | `IContinuationHandler` | `DefaultContinuationHandler` | State machine continuation loop |
+| Budget Tracker | `IBudgetTracker` | `DefaultBudgetTracker` | Advisory token tracking |
+| Turn Manager | `IThinkingTurnManager` | `DefaultThinkingTurnManager` | Orchestrates all components |
+| DI Extensions | - | `AgentServiceCollectionExtensions` | Service registration |
+
+**Research Foundation**:
+- [TALE (ACL 2025)](https://arxiv.org/abs/2412.18547) - Token-budget-aware reasoning
+- [SelfBudgeter](https://arxiv.org/abs/2505.11274) - Adaptive token allocation
+- [Reasoning on a Budget Survey](https://arxiv.org/abs/2507.02076) - Test-time compute optimization
+
+**Key Design Decisions**:
+- Budget is **advisory**, not enforced (per TALE research)
+- Continuation uses **state machine** pattern with progress guards
+- Integrates with existing v0.1-v0.6 components (ITruncationDetector, ITokenCounter, etc.)
+- **No breaking changes** to existing APIs
 
 ---
 
