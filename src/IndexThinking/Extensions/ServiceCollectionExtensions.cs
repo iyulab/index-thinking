@@ -1,6 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using IndexThinking.Abstractions;
+using IndexThinking.Agents;
+using IndexThinking.Continuation;
+using IndexThinking.Core;
 using IndexThinking.Stores;
 
 namespace IndexThinking.Extensions;
@@ -116,5 +119,38 @@ public static class ServiceCollectionExtensions
         }
 
         return services.AddIndexThinkingSqliteStorage(options);
+    }
+
+    /// <summary>
+    /// Adds IndexThinking turn management services.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Optional configuration action for agent options.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingAgents(
+        this IServiceCollection services,
+        Action<AgentOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // Register core agent services
+        services.TryAddSingleton<IComplexityEstimator, HeuristicComplexityEstimator>();
+        services.TryAddSingleton<IBudgetTracker, DefaultBudgetTracker>();
+        services.TryAddSingleton<IContinuationHandler, DefaultContinuationHandler>();
+        services.TryAddSingleton<IThinkingTurnManager, DefaultThinkingTurnManager>();
+
+        // Configure options
+        if (configure is not null)
+        {
+            var options = new AgentOptions();
+            configure(options);
+            services.TryAddSingleton(options);
+        }
+        else
+        {
+            services.TryAddSingleton(new AgentOptions());
+        }
+
+        return services;
     }
 }

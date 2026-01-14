@@ -1,8 +1,12 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using IndexThinking.Abstractions;
+using IndexThinking.Agents;
+using IndexThinking.Continuation;
+using IndexThinking.Core;
 using IndexThinking.Extensions;
 using IndexThinking.Stores;
+using Moq;
 using Xunit;
 
 namespace IndexThinking.Tests.Extensions;
@@ -226,6 +230,137 @@ public class ServiceCollectionExtensionsTests
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
+    }
+
+    #endregion
+
+    #region Agent Services
+
+    [Fact]
+    public void AddIndexThinkingAgents_RegistersAllServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Add required dependencies
+        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
+        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
+
+        // Act
+        services.AddIndexThinkingAgents();
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        provider.GetService<IComplexityEstimator>().Should().NotBeNull();
+        provider.GetService<IBudgetTracker>().Should().NotBeNull();
+        provider.GetService<IContinuationHandler>().Should().NotBeNull();
+        provider.GetService<AgentOptions>().Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddIndexThinkingAgents_WithOptions_AppliesConfiguration()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var customBudget = new BudgetConfig
+        {
+            ThinkingBudget = 5000,
+            AnswerBudget = 2000
+        };
+
+        // Add required dependencies
+        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
+        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
+
+        // Act
+        services.AddIndexThinkingAgents(options =>
+        {
+            options.DefaultBudget = customBudget;
+            options.AutoEstimateComplexity = false;
+        });
+        var provider = services.BuildServiceProvider();
+        var resolvedOptions = provider.GetRequiredService<AgentOptions>();
+
+        // Assert
+        resolvedOptions.DefaultBudget.ThinkingBudget.Should().Be(5000);
+        resolvedOptions.DefaultBudget.AnswerBudget.Should().Be(2000);
+        resolvedOptions.AutoEstimateComplexity.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Services_ResolveCorrectly_FromDI()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Add required dependencies
+        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
+        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
+
+        // Act
+        services.AddIndexThinkingAgents();
+        var provider = services.BuildServiceProvider();
+
+        // Assert
+        provider.GetService<IComplexityEstimator>().Should().BeOfType<HeuristicComplexityEstimator>();
+        provider.GetService<IBudgetTracker>().Should().BeOfType<DefaultBudgetTracker>();
+        provider.GetService<IContinuationHandler>().Should().BeOfType<DefaultContinuationHandler>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingAgents_NullServices_Throws()
+    {
+        // Act
+        var action = () => ((IServiceCollection)null!).AddIndexThinkingAgents();
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingAgents_DefaultOptions_HasCorrectDefaults()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Add required dependencies
+        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
+        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+
+        // Act
+        services.AddIndexThinkingAgents();
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<AgentOptions>();
+
+        // Assert
+        options.AutoEstimateComplexity.Should().BeTrue();
+        options.DefaultBudget.Should().NotBeNull();
+        options.DefaultContinuation.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddIndexThinkingAgents_IsSingleton()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Add required dependencies
+        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
+        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
+
+        services.AddIndexThinkingAgents();
+
+        // Act
+        var provider = services.BuildServiceProvider();
+        var estimator1 = provider.GetService<IComplexityEstimator>();
+        var estimator2 = provider.GetService<IComplexityEstimator>();
+
+        // Assert
+        estimator1.Should().BeSameAs(estimator2);
     }
 
     #endregion
