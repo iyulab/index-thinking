@@ -94,7 +94,7 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.7.0 | Agent Framework | Internal agents, turn manager, budget tracking |
 | v0.7.5 | Client Integration | ThinkingChatClient, UseIndexThinking() |
 | v0.8.0 | Memory Integration | IMemoryProvider, FuncMemoryProvider, NullMemoryProvider |
-| **v0.8.5** | **Query Enhancement** | **Context tracking, ambiguous query resolution, memory integration** |
+| **v0.8.5** | **Context-Aware Chat** | **Conversation tracking, context injection, sliding window** |
 | **v0.9.0** | **Session-Aware SDK** | **IThinkingService, userId/sessionId API** |
 | v0.10.0 | State Storage II | Redis + PostgreSQL distributed stores |
 | v0.11.0 | Resilience & Observability | Polly integration, telemetry, logging |
@@ -1185,22 +1185,26 @@ src/IndexThinking/
 
 ---
 
-## v0.8.5 - Query Enhancement
+## v0.8.5 - Context-Aware Chat Infrastructure
 
-**Goal**: Transform ambiguous user messages into clear, context-aware prompts.
+**Goal**: Provide conversation context to LLM for natural reference resolution.
 
-### Motivation
+### Philosophy (Revised from Original Plan)
 
-LLM APIs are stateless, but users speak in context:
-```
-User sends:     "Do that thing again"
-LLM needs:      "Python DataFrame을 CSV로 저장하는 작업을 다시 실행해주세요"
-```
+**Original approach** (IQueryEnricher, pronoun resolution):
+- Programmatically resolve "this", "that thing" → explicit entities
+- Extra LLM calls or rule-based interpretation
 
-IndexThinking bridges this gap by:
-1. Tracking conversation context (recent topics, entities)
-2. Resolving ambiguous references ("this", "that thing", "make it faster")
-3. Enriching queries with relevant memory (via v0.8.0 IMemoryProvider)
+**Critical insight** from LangChain/LangChain4j research:
+- LLMs are excellent at understanding conversational context
+- Programmatic pronoun resolution is limited and error-prone
+- Extra LLM calls violate zero-config philosophy
+
+**New approach** (Context Injection):
+- Track conversation history with sliding window
+- Inject previous turns as context to LLM
+- Let LLM naturally understand "Do that thing again"
+- Zero additional LLM calls
 
 ### Core Interfaces
 
@@ -1210,65 +1214,72 @@ IndexThinking bridges this gap by:
 /// </summary>
 public interface IContextTracker
 {
-    void Track(string sessionId, ChatMessage message, ChatResponse response);
+    void Track(string sessionId, ChatMessage userMessage, ChatResponse? response);
     ConversationContext GetContext(string sessionId);
+    void Clear(string sessionId);
+    bool HasContext(string sessionId);
 }
 
 /// <summary>
-/// Enriches user messages with context and memory.
+/// Injects conversation context into messages for context-aware LLM processing.
 /// </summary>
-public interface IQueryEnricher
+public interface IContextInjector
 {
-    Task<IList<ChatMessage>> EnrichAsync(
-        ThinkingContext context,
-        IList<ChatMessage> messages,
-        CancellationToken ct = default);
+    IList<ChatMessage> InjectContext(IList<ChatMessage> messages, ConversationContext context);
 }
 
-public record ConversationContext
+public sealed record ConversationTurn
 {
-    public IReadOnlyList<string> RecentTopics { get; init; }
-    public IReadOnlyDictionary<string, string> Entities { get; init; }  // "그 파일" → "app.py"
-    public string? LastAction { get; init; }  // "Python 코드 실행"
+    public required ChatMessage UserMessage { get; init; }
+    public ChatResponse? AssistantResponse { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public string TurnId { get; init; }
+}
+
+public sealed record ConversationContext
+{
+    public required string SessionId { get; init; }
+    public IReadOnlyList<ConversationTurn> RecentTurns { get; init; }
+    public int TotalTurnCount { get; init; }
+    public bool HasHistory => RecentTurns.Count > 0;
 }
 ```
 
 ### Tasks
-- [ ] Define `IContextTracker` interface
-- [ ] Implement `InMemoryContextTracker`
-- [ ] Define `IQueryEnricher` interface
-- [ ] Implement `DefaultQueryEnricher`
-  - Pronoun resolution ("this" → actual entity)
-  - Action reference ("that thing" → last action)
-  - Topic continuation detection
-- [ ] Define `IFollowUpGenerator` interface
-- [ ] Implement `DefaultFollowUpGenerator`
-  - Context-aware follow-up question suggestions
-  - Response-based next action recommendations
-- [ ] Integrate with `IMemoryProvider` (v0.8.0)
-- [ ] Add to ThinkingChatClient pipeline (pre + post processing)
-
-### Test Requirements
-- [ ] Pronoun resolution tests
-- [ ] Action reference resolution tests
-- [ ] Topic detection tests
-- [ ] Integration with memory recall
+- [x] Define `IContextTracker` interface
+- [x] Implement `InMemoryContextTracker` with sliding window
+- [x] Define `IContextInjector` interface
+- [x] Implement `DefaultContextInjector` (prepends history as messages)
+- [x] Create `ConversationTurn` and `ConversationContext` types
+- [x] Add DI extensions: `AddIndexThinkingContext()`
+- [x] Unit tests for all components
 
 ### Configuration
 
 ```csharp
-.UseIndexThinking(options =>
-{
-    options.EnableQueryEnrichment = true;     // Enable pre-processing
-    options.ContextWindowSize = 5;            // Track last 5 turns
-    options.ResolvePronouns = true;           // "this" → entity
-    options.ResolveActionReferences = true;   // "that thing" → action
-})
+services.AddIndexThinkingContext(
+    trackerOptions =>
+    {
+        trackerOptions.MaxTurns = 10;                    // Sliding window size
+        trackerOptions.SessionTtl = TimeSpan.FromHours(1);
+        trackerOptions.EnableCleanupTimer = true;
+    },
+    injectorOptions =>
+    {
+        injectorOptions.EnableInjection = true;
+        injectorOptions.MaxTurnsToInject = 5;            // Limit context size
+    });
 ```
 
 ### Deliverables
-- `IndexThinking.Context` namespace
-- Query enrichment pipeline in ThinkingChatClient
+- `IndexThinking.Context` namespace with full implementation
+- `IndexThinking.Abstractions.IContextTracker` interface
+- `IndexThinking.Abstractions.IContextInjector` interface
+- DI extensions in `ServiceCollectionExtensions`
+
+### Deferred to Later Versions
+- `IFollowUpGenerator` → v0.9.x (separate concern)
+- Memory-enhanced context → Uses existing IMemoryProvider integration
 
 ---
 
@@ -1624,9 +1635,9 @@ Scope: core, parsers, storage, agents, sdk, samples
 - Fact extraction → Deferred to v0.9.x (separate concern)
 - Memory-aware context building → Part of v0.8.5 Query Enhancement
 
-### v0.8.5 Query Enhancement - PLANNED
+### v0.8.5 Context-Aware Chat Infrastructure - COMPLETE ✅
 
-**Scope**: Transform ambiguous messages into context-aware prompts
+**Scope**: Conversation context tracking and injection for natural LLM understanding
 
 **The Problem**:
 ```
@@ -1637,16 +1648,25 @@ LLM API (stateless):              User sends (contextual):
                                   "그 파일 수정해줘"
 ```
 
-**Components to Implement**:
-- [ ] `IContextTracker` - Track recent topics, entities, actions
-- [ ] `IQueryEnricher` - Resolve pronouns, action references
-- [ ] Pre-processing pipeline in ThinkingChatClient
-- [ ] Integration with IMemoryProvider
+**Solution Approach** (after critical review):
+- Instead of programmatic pronoun resolution (extra LLM calls, limited accuracy)
+- Inject conversation history → LLM naturally understands context
+
+**Completed**:
+- [x] `IContextTracker` interface - Session-based conversation tracking
+- [x] `InMemoryContextTracker` - Sliding window with TTL support
+- [x] `IContextInjector` interface - Context injection abstraction
+- [x] `DefaultContextInjector` - Prepends history as messages
+- [x] `ConversationTurn` / `ConversationContext` - Core types
+- [x] `ContextTrackerOptions` / `ContextInjectorOptions` - Configuration
+- [x] DI Extensions: `AddIndexThinkingContext()`
+- [x] 65+ unit tests passing (559 previous + new Context tests)
 
 **Key Design Decisions**:
-- Zero-config default (basic context tracking)
-- Optional memory integration for richer context
-- Pronoun/reference resolution is language-aware
+- Zero additional LLM calls (LLM handles context naturally)
+- Sliding window pattern (like LangChain/LangChain4j)
+- Configurable injection limits for token management
+- Thread-safe implementation with cleanup timer
 
 ---
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
+using IndexThinking.Context;
 using IndexThinking.Continuation;
 using IndexThinking.Core;
 using IndexThinking.Memory;
@@ -241,6 +242,73 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(provider);
 
         services.AddSingleton(provider);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds context tracking services with default options.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// Registers:
+    /// <list type="bullet">
+    ///   <item><see cref="IContextTracker"/> - In-memory context tracker</item>
+    ///   <item><see cref="IContextInjector"/> - Default context injector</item>
+    /// </list>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingContext(this IServiceCollection services)
+    {
+        return services.AddIndexThinkingContext(
+            ContextTrackerOptions.Default,
+            ContextInjectorOptions.Default);
+    }
+
+    /// <summary>
+    /// Adds context tracking services with configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configureTracker">Tracker options configuration.</param>
+    /// <param name="configureInjector">Injector options configuration.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingContext(
+        this IServiceCollection services,
+        Action<ContextTrackerOptions>? configureTracker = null,
+        Action<ContextInjectorOptions>? configureInjector = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        var trackerOptions = new ContextTrackerOptions();
+        configureTracker?.Invoke(trackerOptions);
+
+        var injectorOptions = new ContextInjectorOptions();
+        configureInjector?.Invoke(injectorOptions);
+
+        return services.AddIndexThinkingContext(trackerOptions, injectorOptions);
+    }
+
+    /// <summary>
+    /// Adds context tracking services with specified options.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="trackerOptions">Context tracker options.</param>
+    /// <param name="injectorOptions">Context injector options.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingContext(
+        this IServiceCollection services,
+        ContextTrackerOptions trackerOptions,
+        ContextInjectorOptions injectorOptions)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(trackerOptions);
+        ArgumentNullException.ThrowIfNull(injectorOptions);
+
+        services.TryAddSingleton(trackerOptions);
+        services.TryAddSingleton<IContextTracker, InMemoryContextTracker>();
+
+        services.TryAddSingleton(injectorOptions);
+        services.TryAddSingleton<IContextInjector, DefaultContextInjector>();
 
         return services;
     }
