@@ -1450,31 +1450,40 @@ Scope: core, parsers, storage, agents, sdk, samples
   - OpenSource model prefixes (deepseek, qwen, qwq, glm)
 - [x] 418 unit tests passing (357 previous + 61 new parsers)
 
-### v0.7.0 Internal Thinking Agents - NEXT
+### v0.7.0 Internal Thinking Agents - COMPLETE ✅
 
-**Scope**: Single-turn thinking optimization (NOT Agent Orchestration)
+**Completed:**
+- [x] Core types: `ThinkingContext`, `TurnResult`, `TurnMetrics`, `BudgetUsage`
+- [x] `IComplexityEstimator` / `HeuristicComplexityEstimator` - TALE-inspired budget recommendation
+- [x] `IContinuationHandler` / `DefaultContinuationHandler` - State machine continuation loop
+- [x] `IBudgetTracker` / `DefaultBudgetTracker` - Advisory token tracking
+- [x] `IThinkingTurnManager` / `DefaultThinkingTurnManager` - Turn orchestration
+- [x] DI extensions: `AddIndexThinkingAgents()`
+- [x] 504 unit tests passing (418 previous + 86 agents)
 
-**Components to Implement** (32+ tests planned):
+### v0.7.5 ThinkingChatClient - COMPLETE ✅
 
-| Component | Interface | Implementation | Purpose |
-|-----------|-----------|----------------|---------|
-| Core Types | - | `ThinkingContext`, `TurnResult`, `TurnMetrics` | Turn-level data structures |
-| Complexity Estimator | `IComplexityEstimator` | `HeuristicComplexityEstimator` | TALE-inspired budget recommendation |
-| Continuation Handler | `IContinuationHandler` | `DefaultContinuationHandler` | State machine continuation loop |
-| Budget Tracker | `IBudgetTracker` | `DefaultBudgetTracker` | Advisory token tracking |
-| Turn Manager | `IThinkingTurnManager` | `DefaultThinkingTurnManager` | Orchestrates all components |
-| DI Extensions | - | `AgentServiceCollectionExtensions` | Service registration |
+**Completed:**
+- [x] `ThinkingChatClient : DelegatingChatClient` - Main integration point
+- [x] `ThinkingChatClientOptions` - Zero-config with customization support
+- [x] `UseIndexThinking()` extension for `ChatClientBuilder`
+- [x] Response metadata extensions: `GetThinkingContent()`, `GetTurnMetrics()`, `GetTurnResult()`
+- [x] 523 unit tests passing (504 previous + 19 client)
 
-**Research Foundation**:
-- [TALE (ACL 2025)](https://arxiv.org/abs/2412.18547) - Token-budget-aware reasoning
-- [SelfBudgeter](https://arxiv.org/abs/2505.11274) - Adaptive token allocation
-- [Reasoning on a Budget Survey](https://arxiv.org/abs/2507.02076) - Test-time compute optimization
+### v0.8.0 Memory Integration - NEXT
+
+**Scope**: Integration with Memory-Indexer for long-term memory recall
+
+**Components to Implement**:
+- [ ] `IMemoryProvider` interface
+- [ ] `MemoryAgent` for coordinating with Memory-Indexer
+- [ ] Memory-aware context builder
+- [ ] Fact extraction pipeline
 
 **Key Design Decisions**:
-- Budget is **advisory**, not enforced (per TALE research)
-- Continuation uses **state machine** pattern with progress guards
-- Integrates with existing v0.1-v0.6 components (ITruncationDetector, ITokenCounter, etc.)
-- **No breaking changes** to existing APIs
+- Memory-Indexer = Long-term Memory (past knowledge)
+- IndexThinking = Working Memory (current reasoning)
+- Integration is optional (works without Memory-Indexer)
 
 ---
 
