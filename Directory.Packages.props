@@ -6,42 +6,49 @@
 
   <ItemGroup>
     <!-- Microsoft.Extensions.AI -->
-    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.1.1" />
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.1.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.2.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.2.0" />
 
     <!-- Tokenization -->
-    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="1.0.2" />
-    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="1.0.2" />
-    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="1.0.2" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.0" />
 
     <!-- Storage -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.4" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.2" />
 
     <!-- Distributed Caching -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.2" />
 
     <!-- Health Checks -->
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.2" />
 
     <!-- Dependency Injection -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.2" />
 
     <!-- Samples -->
     <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.2.0-preview.1.26063.2" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
     <PackageVersion Include="DotNetEnv" Version="3.1.1" />
+
+    <!-- AI Providers for Simulation Tests -->
+    <PackageVersion Include="Anthropic" Version="12.1.0" />
+    <PackageVersion Include="GeminiDotnet.Extensions.AI" Version="0.14.1" />
 
     <!-- Testing -->
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.0.2" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Moq" Version="4.20.72" />
-    <PackageVersion Include="FluentAssertions" Version="8.1.0" />
+    <PackageVersion Include="FluentAssertions" Version="8.8.0" />
+
+    <!-- Source Link -->
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.102" />
   </ItemGroup>
 
 </Project>

@@ -10,6 +10,7 @@ using IndexThinking.Core;
 using IndexThinking.Diagnostics;
 using IndexThinking.Memory;
 using IndexThinking.Stores;
+using IndexThinking.Tokenization;
 
 namespace IndexThinking.Extensions;
 
@@ -138,6 +139,10 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Register tokenization and truncation detection services
+        services.TryAddSingleton<ITokenCounter, ApproximateTokenCounter>();
+        services.TryAddSingleton<ITruncationDetector, TruncationDetector>();
+
         // Register core agent services
         services.TryAddSingleton<IComplexityEstimator, HeuristicComplexityEstimator>();
         services.TryAddSingleton<IBudgetTracker, DefaultBudgetTracker>();
@@ -178,7 +183,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds a function-based memory provider.
+    /// Adds a function-based memory provider (recall-only).
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="recallDelegate">The delegate that performs memory recall.</param>
@@ -186,6 +191,7 @@ public static class ServiceCollectionExtensions
     /// <remarks>
     /// <para>
     /// Use this to integrate with any memory backend without direct dependencies.
+    /// For bidirectional memory (recall + remember), use the overload with both delegates.
     /// </para>
     /// <para>
     /// Example with Memory-Indexer:
@@ -207,10 +213,60 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         MemoryRecallDelegate recallDelegate)
     {
+        return services.AddIndexThinkingMemory(recallDelegate, null);
+    }
+
+    /// <summary>
+    /// Adds a function-based memory provider with bidirectional support (recall + remember).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="recallDelegate">The delegate that performs memory recall.</param>
+    /// <param name="rememberDelegate">The optional delegate that performs memory storage.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this to integrate with any memory backend without direct dependencies.
+    /// </para>
+    /// <para>
+    /// Example with Memory-Indexer:
+    /// </para>
+    /// <code>
+    /// services.AddIndexThinkingMemory(
+    ///     recallDelegate: async (userId, sessionId, query, limit, ct) =>
+    ///     {
+    ///         var context = await memoryService.RecallAsync(userId, sessionId, query, limit, ct);
+    ///         return new MemoryRecallResult
+    ///         {
+    ///             UserMemories = context.UserMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+    ///             SessionMemories = context.SessionMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+    ///             TopicMemories = context.TopicMemories.Select(m => (m.Content, m.Relevance)).ToList()
+    ///         };
+    ///     },
+    ///     rememberDelegate: async (userId, sessionId, memories, ct) =>
+    ///     {
+    ///         foreach (var memory in memories)
+    ///         {
+    ///             var scope = memory.Scope switch
+    ///             {
+    ///                 MemoryScope.User => "user",
+    ///                 MemoryScope.Session => "session",
+    ///                 MemoryScope.Topic => "topic",
+    ///                 _ => "session"
+    ///             };
+    ///             await memoryService.RememberAsync(userId, sessionId, memory.Content, scope, ct);
+    ///         }
+    ///     });
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingMemory(
+        this IServiceCollection services,
+        MemoryRecallDelegate recallDelegate,
+        MemoryRememberDelegate? rememberDelegate)
+    {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(recallDelegate);
 
-        services.AddSingleton<IMemoryProvider>(new FuncMemoryProvider(recallDelegate));
+        services.AddSingleton<IMemoryProvider>(new FuncMemoryProvider(recallDelegate, rememberDelegate));
 
         return services;
     }

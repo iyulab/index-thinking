@@ -57,4 +57,18 @@ public sealed class NullMemoryProvider : IMemoryProvider
 
         return Task.FromResult(MemoryRecallContext.Empty(query));
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// No-op implementation. Memories are not stored.
+    /// </remarks>
+    public Task RememberAsync(
+        string userId,
+        string? sessionId,
+        IEnumerable<MemoryStoreRequest> memories,
+        CancellationToken cancellationToken = default)
+    {
+        // No-op: NullMemoryProvider does not store memories
+        return Task.CompletedTask;
+    }
 }

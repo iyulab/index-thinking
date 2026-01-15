@@ -182,4 +182,137 @@ public class FuncMemoryProviderTests
         // Assert
         capturedToken.Should().Be(cts.Token);
     }
+
+    #region RememberAsync Tests
+
+    [Fact]
+    public async Task RememberAsync_WithNoDelegate_CompletesWithoutError()
+    {
+        // Arrange - Provider with no remember delegate
+        var provider = new FuncMemoryProvider((_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty));
+        var memories = new List<MemoryStoreRequest>
+        {
+            new() { Content = "Test memory" }
+        };
+
+        // Act & Assert - Should not throw
+        await provider.RememberAsync("user-1", "session-1", memories);
+    }
+
+    [Fact]
+    public async Task RememberAsync_WithDelegate_CallsDelegate()
+    {
+        // Arrange
+        var called = false;
+        string? capturedUserId = null;
+        string? capturedSessionId = null;
+        List<MemoryStoreRequest>? capturedMemories = null;
+
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: (userId, sessionId, memories, ct) =>
+            {
+                called = true;
+                capturedUserId = userId;
+                capturedSessionId = sessionId;
+                capturedMemories = memories.ToList();
+                return Task.CompletedTask;
+            });
+
+        var memoriesToStore = new List<MemoryStoreRequest>
+        {
+            new() { Content = "Memory 1", Scope = MemoryScope.User },
+            new() { Content = "Memory 2", Scope = MemoryScope.Session }
+        };
+
+        // Act
+        await provider.RememberAsync("user-1", "session-1", memoriesToStore);
+
+        // Assert
+        called.Should().BeTrue();
+        capturedUserId.Should().Be("user-1");
+        capturedSessionId.Should().Be("session-1");
+        capturedMemories.Should().HaveCount(2);
+        capturedMemories![0].Content.Should().Be("Memory 1");
+        capturedMemories[0].Scope.Should().Be(MemoryScope.User);
+        capturedMemories[1].Content.Should().Be("Memory 2");
+        capturedMemories[1].Scope.Should().Be(MemoryScope.Session);
+    }
+
+    [Fact]
+    public async Task RememberAsync_PassesCancellationToken()
+    {
+        // Arrange
+        CancellationToken capturedToken = default;
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: (_, _, _, ct) =>
+            {
+                capturedToken = ct;
+                return Task.CompletedTask;
+            });
+        using var cts = new CancellationTokenSource();
+
+        // Act
+        await provider.RememberAsync("user-1", null, [], cts.Token);
+
+        // Assert
+        capturedToken.Should().Be(cts.Token);
+    }
+
+    [Fact]
+    public async Task RememberAsync_NullUserId_Throws()
+    {
+        // Arrange
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: (_, _, _, _) => Task.CompletedTask);
+
+        // Act & Assert
+        await Assert.ThrowsAnyAsync<ArgumentException>(() =>
+            provider.RememberAsync(null!, null, []));
+    }
+
+    [Fact]
+    public async Task RememberAsync_NullMemories_Throws()
+    {
+        // Arrange
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: (_, _, _, _) => Task.CompletedTask);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            provider.RememberAsync("user-1", null, null!));
+    }
+
+    #endregion
+
+    #region Constructor Tests
+
+    [Fact]
+    public void Constructor_WithBothDelegates_Succeeds()
+    {
+        // Arrange & Act
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: (_, _, _, _) => Task.CompletedTask);
+
+        // Assert
+        provider.IsConfigured.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Constructor_WithNullRememberDelegate_Succeeds()
+    {
+        // Arrange & Act
+        var provider = new FuncMemoryProvider(
+            recallDelegate: (_, _, _, _, _) => Task.FromResult(MemoryRecallResult.Empty),
+            rememberDelegate: null);
+
+        // Assert
+        provider.IsConfigured.Should().BeTrue();
+    }
+
+    #endregion
 }

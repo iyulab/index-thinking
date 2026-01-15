@@ -17,6 +17,18 @@ public delegate Task<MemoryRecallResult> MemoryRecallDelegate(
     CancellationToken cancellationToken);
 
 /// <summary>
+/// Delegate for memory storage operations.
+/// </summary>
+/// <remarks>
+/// This delegate allows storing memories to any backend without direct package dependency.
+/// </remarks>
+public delegate Task MemoryRememberDelegate(
+    string userId,
+    string? sessionId,
+    IEnumerable<MemoryStoreRequest> memories,
+    CancellationToken cancellationToken);
+
+/// <summary>
 /// Result of a memory recall delegate call.
 /// </summary>
 /// <remarks>
@@ -47,13 +59,13 @@ public sealed record MemoryRecallResult
 }
 
 /// <summary>
-/// A memory provider that delegates to a function.
+/// A memory provider that delegates to functions.
 /// </summary>
 /// <remarks>
 /// <para>
 /// This provider enables integration with any memory backend without requiring
-/// direct package dependencies. It accepts a <see cref="MemoryRecallDelegate"/>
-/// that performs the actual recall operation.
+/// direct package dependencies. It accepts delegates for recall and optionally
+/// remember operations.
 /// </para>
 /// <para>
 /// Example usage with Memory-Indexer:
@@ -61,21 +73,30 @@ public sealed record MemoryRecallResult
 /// <code>
 /// // In your application startup
 /// var memoryService = serviceProvider.GetRequiredService&lt;IMemoryService&gt;();
-/// var provider = new FuncMemoryProvider(async (userId, sessionId, query, limit, ct) =>
-/// {
-///     var context = await memoryService.RecallAsync(userId, sessionId, query, limit, ct);
-///     return new MemoryRecallResult
+/// var provider = new FuncMemoryProvider(
+///     recallDelegate: async (userId, sessionId, query, limit, ct) =>
 ///     {
-///         UserMemories = context.UserMemories.Select(m => (m.Content, m.Relevance)).ToList(),
-///         SessionMemories = context.SessionMemories.Select(m => (m.Content, m.Relevance)).ToList(),
-///         TopicMemories = context.TopicMemories.Select(m => (m.Content, m.Relevance)).ToList()
-///     };
-/// });
+///         var context = await memoryService.RecallAsync(userId, sessionId, query, limit, ct);
+///         return new MemoryRecallResult
+///         {
+///             UserMemories = context.UserMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+///             SessionMemories = context.SessionMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+///             TopicMemories = context.TopicMemories.Select(m => (m.Content, m.Relevance)).ToList()
+///         };
+///     },
+///     rememberDelegate: async (userId, sessionId, memories, ct) =>
+///     {
+///         foreach (var memory in memories)
+///         {
+///             await memoryService.RememberAsync(userId, sessionId, memory.Content, ct);
+///         }
+///     });
 /// </code>
 /// </remarks>
 public sealed class FuncMemoryProvider : IMemoryProvider
 {
     private readonly MemoryRecallDelegate _recallDelegate;
+    private readonly MemoryRememberDelegate? _rememberDelegate;
 
     /// <summary>
     /// Creates a new <see cref="FuncMemoryProvider"/> with the specified recall delegate.
@@ -83,8 +104,22 @@ public sealed class FuncMemoryProvider : IMemoryProvider
     /// <param name="recallDelegate">The delegate that performs memory recall.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="recallDelegate"/> is null.</exception>
     public FuncMemoryProvider(MemoryRecallDelegate recallDelegate)
+        : this(recallDelegate, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="FuncMemoryProvider"/> with both recall and remember delegates.
+    /// </summary>
+    /// <param name="recallDelegate">The delegate that performs memory recall.</param>
+    /// <param name="rememberDelegate">The optional delegate that performs memory storage.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="recallDelegate"/> is null.</exception>
+    public FuncMemoryProvider(
+        MemoryRecallDelegate recallDelegate,
+        MemoryRememberDelegate? rememberDelegate)
     {
         _recallDelegate = recallDelegate ?? throw new ArgumentNullException(nameof(recallDelegate));
+        _rememberDelegate = rememberDelegate;
     }
 
     /// <inheritdoc />
@@ -123,6 +158,31 @@ public sealed class FuncMemoryProvider : IMemoryProvider
             SessionMemories = sessionMemories,
             TopicMemories = topicMemories
         };
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// If a remember delegate was provided, it is invoked to store the memories.
+    /// Otherwise, this method completes without storing anything.
+    /// </para>
+    /// </remarks>
+    public async Task RememberAsync(
+        string userId,
+        string? sessionId,
+        IEnumerable<MemoryStoreRequest> memories,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentNullException.ThrowIfNull(memories);
+
+        if (_rememberDelegate is null)
+        {
+            // No remember delegate configured, silently ignore
+            return;
+        }
+
+        await _rememberDelegate(userId, sessionId, memories, cancellationToken);
     }
 
     private static List<MemoryEntry> ConvertToEntries(

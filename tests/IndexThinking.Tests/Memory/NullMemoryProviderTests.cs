@@ -106,4 +106,46 @@ public class NullMemoryProviderTests
         // Assert
         await action.Should().ThrowAsync<ArgumentException>();
     }
+
+    #region RememberAsync Tests
+
+    [Fact]
+    public async Task RememberAsync_CompletesWithoutError()
+    {
+        // Arrange
+        var provider = NullMemoryProvider.Instance;
+        var memories = new List<MemoryStoreRequest>
+        {
+            new() { Content = "Test memory", Scope = MemoryScope.User }
+        };
+
+        // Act & Assert - Should complete without throwing
+        await provider.RememberAsync("user-1", "session-1", memories);
+    }
+
+    [Fact]
+    public async Task RememberAsync_WithEmptyMemories_CompletesWithoutError()
+    {
+        // Arrange
+        var provider = NullMemoryProvider.Instance;
+
+        // Act & Assert
+        await provider.RememberAsync("user-1", null, []);
+    }
+
+    [Fact]
+    public async Task RememberAsync_WithNullSessionId_CompletesWithoutError()
+    {
+        // Arrange
+        var provider = NullMemoryProvider.Instance;
+        var memories = new List<MemoryStoreRequest>
+        {
+            new() { Content = "Memory content" }
+        };
+
+        // Act & Assert
+        await provider.RememberAsync("user-1", null, memories);
+    }
+
+    #endregion
 }

@@ -66,4 +66,32 @@ public interface IMemoryProvider
         string query,
         int limit = 10,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stores memories to the long-term memory backend.
+    /// </summary>
+    /// <param name="userId">User identifier for user-scoped memories.</param>
+    /// <param name="sessionId">Optional session identifier for session-scoped memories.</param>
+    /// <param name="memories">The memories to store.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this method to persist important facts extracted during conversation:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>User preferences and settings</item>
+    ///   <item>Important context from the current session</item>
+    ///   <item>Key decisions or facts mentioned by the user</item>
+    /// </list>
+    /// <para>
+    /// The memory backend determines how memories are stored and indexed.
+    /// For <see cref="Memory.NullMemoryProvider"/>, this is a no-op.
+    /// </para>
+    /// </remarks>
+    Task RememberAsync(
+        string userId,
+        string? sessionId,
+        IEnumerable<MemoryStoreRequest> memories,
+        CancellationToken cancellationToken = default);
 }

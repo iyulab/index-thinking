@@ -126,5 +126,14 @@ public class MemoryServiceCollectionExtensionsTests
         {
             return Task.FromResult(MemoryRecallContext.Empty(query));
         }
+
+        public Task RememberAsync(
+            string userId,
+            string? sessionId,
+            IEnumerable<MemoryStoreRequest> memories,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

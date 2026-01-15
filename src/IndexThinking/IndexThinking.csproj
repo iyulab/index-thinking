@@ -3,7 +3,8 @@
   <PropertyGroup>
     <PackageId>IndexThinking</PackageId>
     <Description>Working Memory manager for Reasoning-capable LLMs. Manages turn lifecycle, token budgets, and response continuation.</Description>
-    <PackageTags>ai;llm;reasoning;thinking;memory;claude;openai;gemini</PackageTags>
+    <PackageTags>ai;llm;reasoning;thinking;memory;claude;openai;gemini;deepseek;qwen</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,6 +17,11 @@
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
