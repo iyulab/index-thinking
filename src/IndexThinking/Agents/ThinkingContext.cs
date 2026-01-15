@@ -1,5 +1,6 @@
 using IndexThinking.Continuation;
 using IndexThinking.Core;
+using IndexThinking.Memory;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Agents;
@@ -21,9 +22,21 @@ public sealed record ThinkingContext
     public required string SessionId { get; init; }
 
     /// <summary>
+    /// User identifier for memory operations (optional).
+    /// When provided, enables memory recall for this turn.
+    /// </summary>
+    public string? UserId { get; init; }
+
+    /// <summary>
     /// The original user request messages.
     /// </summary>
     public required IList<ChatMessage> Messages { get; init; }
+
+    /// <summary>
+    /// Memory context recalled for this turn (if memory is enabled).
+    /// Contains relevant memories from user, session, and topic scopes.
+    /// </summary>
+    public MemoryRecallContext? MemoryContext { get; init; }
 
     /// <summary>
     /// Budget configuration for this turn.
@@ -97,4 +110,21 @@ public sealed record ThinkingContext
     /// </summary>
     public ThinkingContext WithCancellation(CancellationToken cancellationToken) =>
         this with { CancellationToken = cancellationToken };
+
+    /// <summary>
+    /// Creates a copy with the specified user ID.
+    /// </summary>
+    public ThinkingContext WithUserId(string userId) =>
+        this with { UserId = userId };
+
+    /// <summary>
+    /// Creates a copy with the specified memory context.
+    /// </summary>
+    public ThinkingContext WithMemory(MemoryRecallContext memoryContext) =>
+        this with { MemoryContext = memoryContext };
+
+    /// <summary>
+    /// Whether memory is available for this context.
+    /// </summary>
+    public bool HasMemory => MemoryContext is not null && MemoryContext.HasMemories;
 }

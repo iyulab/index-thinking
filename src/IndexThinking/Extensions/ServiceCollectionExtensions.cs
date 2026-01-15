@@ -4,6 +4,7 @@ using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Continuation;
 using IndexThinking.Core;
+using IndexThinking.Memory;
 using IndexThinking.Stores;
 
 namespace IndexThinking.Extensions;
@@ -150,6 +151,96 @@ public static class ServiceCollectionExtensions
         {
             services.TryAddSingleton(new AgentOptions());
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds the null memory provider (no-op, zero-config mode).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// This is the default when no memory provider is explicitly configured.
+    /// Memory-dependent features are disabled.
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingNullMemory(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IMemoryProvider>(NullMemoryProvider.Instance);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a function-based memory provider.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="recallDelegate">The delegate that performs memory recall.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this to integrate with any memory backend without direct dependencies.
+    /// </para>
+    /// <para>
+    /// Example with Memory-Indexer:
+    /// </para>
+    /// <code>
+    /// services.AddIndexThinkingMemory(async (userId, sessionId, query, limit, ct) =>
+    /// {
+    ///     var context = await memoryService.RecallAsync(userId, sessionId, query, limit, ct);
+    ///     return new MemoryRecallResult
+    ///     {
+    ///         UserMemories = context.UserMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+    ///         SessionMemories = context.SessionMemories.Select(m => (m.Content, m.Relevance)).ToList(),
+    ///         TopicMemories = context.TopicMemories.Select(m => (m.Content, m.Relevance)).ToList()
+    ///     };
+    /// });
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingMemory(
+        this IServiceCollection services,
+        MemoryRecallDelegate recallDelegate)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(recallDelegate);
+
+        services.AddSingleton<IMemoryProvider>(new FuncMemoryProvider(recallDelegate));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a custom memory provider.
+    /// </summary>
+    /// <typeparam name="TProvider">The memory provider type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingMemory<TProvider>(this IServiceCollection services)
+        where TProvider : class, IMemoryProvider
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.AddSingleton<IMemoryProvider, TProvider>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a custom memory provider instance.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="provider">The memory provider instance.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingMemory(
+        this IServiceCollection services,
+        IMemoryProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(provider);
+
+        services.AddSingleton(provider);
 
         return services;
     }

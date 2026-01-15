@@ -93,8 +93,8 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.6.0 | Reasoning Parsers II | Gemini + DeepSeek/Open-source parsers |
 | v0.7.0 | Agent Framework | Internal agents, turn manager, budget tracking |
 | v0.7.5 | Client Integration | ThinkingChatClient, UseIndexThinking() |
-| v0.8.0 | Memory Integration | Memory-Indexer integration, IMemoryProvider |
-| **v0.8.5** | **Query Enhancement** | **Context tracking, ambiguous query resolution** |
+| v0.8.0 | Memory Integration | IMemoryProvider, FuncMemoryProvider, NullMemoryProvider |
+| **v0.8.5** | **Query Enhancement** | **Context tracking, ambiguous query resolution, memory integration** |
 | **v0.9.0** | **Session-Aware SDK** | **IThinkingService, userId/sessionId API** |
 | v0.10.0 | State Storage II | Redis + PostgreSQL distributed stores |
 | v0.11.0 | Resilience & Observability | Polly integration, telemetry, logging |
@@ -1603,20 +1603,26 @@ Scope: core, parsers, storage, agents, sdk, samples
 - [x] Response metadata extensions: `GetThinkingContent()`, `GetTurnMetrics()`, `GetTurnResult()`
 - [x] 523 unit tests passing (504 previous + 19 client)
 
-### v0.8.0 Memory Integration - NEXT
+### v0.8.0 Memory Integration - COMPLETE ✅
 
-**Scope**: Integration with Memory-Indexer for long-term memory recall
+**Scope**: Memory provider abstraction layer for optional Memory-Indexer integration
 
-**Components to Implement**:
-- [ ] `IMemoryProvider` interface
-- [ ] `MemoryAgent` for coordinating with Memory-Indexer
-- [ ] Memory-aware context builder
-- [ ] Fact extraction pipeline
+**Completed**:
+- [x] `IMemoryProvider` interface - Abstraction for memory recall
+- [x] `MemoryRecallContext` / `MemoryEntry` - Memory recall result types
+- [x] `NullMemoryProvider` - No-op default (zero-config mode)
+- [x] `FuncMemoryProvider` - Delegate-based integration
+- [x] `ThinkingContext.MemoryContext` - Memory context extension
+- [x] DI Extensions: `AddIndexThinkingMemory()`, `AddIndexThinkingNullMemory()`
+- [x] 559 unit tests passing (523 previous + 36 memory)
 
 **Key Design Decisions**:
 - Memory-Indexer = Long-term Memory (past knowledge)
 - IndexThinking = Working Memory (current reasoning)
-- Integration is optional (works without Memory-Indexer)
+- Integration is optional (NullMemoryProvider is default)
+- FuncMemoryProvider enables Memory-Indexer integration without direct dependency
+- Fact extraction → Deferred to v0.9.x (separate concern)
+- Memory-aware context building → Part of v0.8.5 Query Enhancement
 
 ### v0.8.5 Query Enhancement - PLANNED
 
