@@ -9,10 +9,28 @@ namespace IndexThinking.Continuation;
 /// Detects truncation in LLM responses using multiple strategies.
 /// </summary>
 /// <remarks>
-/// Detection strategies:
-/// 1. FinishReason analysis (primary) - ChatFinishReason.Length indicates truncation
-/// 2. Structural analysis (secondary) - Unbalanced braces, incomplete code blocks
-/// 3. Heuristic analysis (tertiary) - Mid-sentence endings
+/// <para>Detection strategies:</para>
+/// <list type="number">
+/// <item>FinishReason analysis (primary) - Most reliable, provider-specific mapping</item>
+/// <item>Structural analysis (secondary) - Unbalanced braces, incomplete code blocks</item>
+/// <item>Heuristic analysis (tertiary) - Mid-sentence endings</item>
+/// </list>
+///
+/// <para>Provider-specific finish reasons handled:</para>
+/// <list type="bullet">
+/// <item><b>OpenAI</b>: stop, length, content_filter, tool_calls, function_call</item>
+/// <item><b>Anthropic</b>: end_turn, max_tokens, stop_sequence, tool_use, refusal, model_context_window_exceeded</item>
+/// <item><b>Google Gemini</b>: STOP, MAX_TOKENS, SAFETY, RECITATION</item>
+/// <item><b>GPUStack/vLLM</b>: OpenAI-compatible (stop, length)</item>
+/// </list>
+///
+/// <para>Microsoft.Extensions.AI SDK mappings:</para>
+/// <list type="bullet">
+/// <item><see cref="ChatFinishReason.Stop"/> - Normal completion</item>
+/// <item><see cref="ChatFinishReason.Length"/> - Token limit (length, max_tokens, MAX_TOKENS)</item>
+/// <item><see cref="ChatFinishReason.ContentFilter"/> - Content filtered</item>
+/// <item><see cref="ChatFinishReason.ToolCalls"/> - Tool/function call</item>
+/// </list>
 /// </remarks>
 public sealed class TruncationDetector : ITruncationDetector
 {
@@ -124,7 +142,8 @@ public sealed class TruncationDetector : ITruncationDetector
             return TruncationInfo.NotTruncated;
         }
 
-        // ChatFinishReason.Length indicates token limit reached
+        // ChatFinishReason.Length indicates token limit reached (standard abstraction)
+        // This covers: OpenAI "length", Anthropic "max_tokens" (via SDK mapping), Google "MAX_TOKENS"
         if (finishReason == ChatFinishReason.Length)
         {
             return TruncationInfo.Truncated(
@@ -132,14 +151,68 @@ public sealed class TruncationDetector : ITruncationDetector
                 "Response was truncated due to token limit (finish_reason: length)");
         }
 
+        // ChatFinishReason.ContentFilter indicates content was filtered
+        // This covers: OpenAI "content_filter"
+        if (finishReason == ChatFinishReason.ContentFilter)
+        {
+            return TruncationInfo.Truncated(
+                TruncationReason.ContentFiltered,
+                "Response was blocked by content filter");
+        }
+
         // Check for provider-specific stop reasons via Value property
+        // This handles cases where the SDK doesn't map to standard ChatFinishReason
         var reasonValue = finishReason.Value.Value;
+        if (string.IsNullOrEmpty(reasonValue))
+        {
+            return TruncationInfo.NotTruncated;
+        }
+
+        // Token limit variations
+        // Anthropic: "max_tokens", Google: "MAX_TOKENS" (if not mapped by SDK)
         if (string.Equals(reasonValue, "max_tokens", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(reasonValue, "model_context_window_exceeded", StringComparison.OrdinalIgnoreCase))
+            string.Equals(reasonValue, "MAX_TOKENS", StringComparison.OrdinalIgnoreCase))
         {
             return TruncationInfo.Truncated(
                 TruncationReason.TokenLimit,
-                $"Response was truncated (stop_reason: {reasonValue})");
+                $"Response was truncated due to token limit (stop_reason: {reasonValue})");
+        }
+
+        // Context window exceeded
+        // Anthropic: "model_context_window_exceeded"
+        if (string.Equals(reasonValue, "model_context_window_exceeded", StringComparison.OrdinalIgnoreCase))
+        {
+            return TruncationInfo.Truncated(
+                TruncationReason.ContextWindowExceeded,
+                "Response was truncated due to context window limit exceeded");
+        }
+
+        // Safety/Content filter variations
+        // OpenAI: "content_filter", Google: "SAFETY"
+        if (string.Equals(reasonValue, "content_filter", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(reasonValue, "SAFETY", StringComparison.OrdinalIgnoreCase))
+        {
+            return TruncationInfo.Truncated(
+                TruncationReason.ContentFiltered,
+                $"Response was blocked by safety/content filter (stop_reason: {reasonValue})");
+        }
+
+        // Recitation (potential copyright issue)
+        // Google: "RECITATION"
+        if (string.Equals(reasonValue, "RECITATION", StringComparison.OrdinalIgnoreCase))
+        {
+            return TruncationInfo.Truncated(
+                TruncationReason.Recitation,
+                "Response was stopped due to potential recitation/copyright concerns");
+        }
+
+        // Refusal (safety refusal)
+        // Anthropic: "refusal"
+        if (string.Equals(reasonValue, "refusal", StringComparison.OrdinalIgnoreCase))
+        {
+            return TruncationInfo.Truncated(
+                TruncationReason.Refusal,
+                "Model refused to generate response due to safety concerns");
         }
 
         return TruncationInfo.NotTruncated;

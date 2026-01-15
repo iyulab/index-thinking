@@ -146,13 +146,28 @@ var result = response.GetTurnResult();          // Full turn info
 
 IndexThinking works with any `IChatClient` and includes specialized parsers for:
 
-| Provider | Reasoning Format | State Preservation |
-|----------|-----------------|-------------------|
-| **OpenAI** (o1/o3) | `reasoning` field, `encrypted_content` | ✅ |
-| **Anthropic** (Claude) | `thinking` blocks with signatures | ✅ |
-| **Gemini** | `thoughtSignature` | ✅ |
-| **DeepSeek/Qwen** | `<think>` tags, `reasoning_content` | ✅ |
-| **vLLM/Ollama** | Configurable think tags | ✅ |
+| Provider | Reasoning Format | Truncation Handling | State Preservation |
+|----------|-----------------|--------------------|--------------------|
+| **OpenAI** (o1/o3) | `reasoning` field, `encrypted_content` | `length`, `content_filter` | ✅ |
+| **Anthropic** (Claude) | `thinking` blocks with signatures | `max_tokens`, `refusal`, `context_window_exceeded` | ✅ |
+| **Google Gemini** | `thoughtSignature` | `MAX_TOKENS`, `SAFETY`, `RECITATION` | ✅ |
+| **DeepSeek/Qwen** | `<think>` tags, `reasoning_content` | OpenAI-compatible | ✅ |
+| **vLLM/GPUStack/Ollama** | Configurable think tags | `length` (OpenAI-compatible) | ✅ |
+
+### Truncation Reasons
+
+IndexThinking detects and handles various provider-specific stop/finish reasons:
+
+| Reason | Description | Providers |
+|--------|-------------|-----------|
+| `TokenLimit` | Max output tokens reached | All (length, max_tokens, MAX_TOKENS) |
+| `ContentFiltered` | Safety/content filter triggered | OpenAI, Google |
+| `Recitation` | Copyright/recitation concern | Google |
+| `Refusal` | Model safety refusal | Anthropic |
+| `ContextWindowExceeded` | Context window limit exceeded | Anthropic |
+| `UnbalancedStructure` | Incomplete braces/brackets | Structural detection |
+| `IncompleteCodeBlock` | Unclosed code blocks | Structural detection |
+| `MidSentence` | Response ends mid-sentence | Heuristic detection |
 
 ## IndexThinking vs Agent Orchestration
 

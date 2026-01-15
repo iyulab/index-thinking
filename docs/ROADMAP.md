@@ -109,6 +109,7 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.11.0 | Observability | OpenTelemetry integration, custom metrics |
 | v0.12.0 | Samples & Demo | Console, Web API sample applications |
 | v0.13.0 | Production Hardening | E2E testing, documentation, performance tuning |
+| v0.14.0 | Provider Truncation | Provider-specific finish reason handling |
 
 ---
 
@@ -1525,20 +1526,100 @@ GOOGLE_API_KEY=AIza...
 
 ## v0.13.0 - Production Hardening
 
-**Goal**: Comprehensive testing, documentation, and production hardening.
+**Goal**: CI/CD automation, integration tests, and NuGet package preparation.
+
+### Critical Insight
+
+Original plan included E2E tests with real LLM providers, performance benchmarking, and documentation site.
+After review:
+- Real LLM E2E tests require API keys in CI, incur costs → Deferred
+- Performance benchmarking requires BenchmarkDotNet setup → Deferred
+- Documentation site is significant separate effort → Deferred
+
+**Decision**: Focus on CI automation, mock-based integration tests, and NuGet metadata.
 
 ### Tasks
-- [ ] End-to-end test suite with real LLM providers
-- [ ] Performance benchmarking
-- [ ] Security review
-- [ ] API documentation site
-- [ ] CI/CD pipeline with automated testing
-- [ ] Performance optimization
+
+#### GitHub Actions CI
+- [ ] Build and test workflow (`.github/workflows/ci.yml`)
+- [ ] Multi-platform matrix (ubuntu, windows)
+- [ ] PR validation with test results
+- [ ] Code coverage reporting
+
+#### Integration Tests
+- [ ] Mock `IChatClient` for full pipeline testing
+- [ ] `ThinkingChatClient` integration scenarios
+- [ ] Context tracking integration
+- [ ] State storage integration
+
+#### NuGet Package Metadata
+- [ ] `PackageLicenseExpression` (MIT)
+- [ ] `PackageReadmeFile` (README.md)
+- [ ] `VersionPrefix` for SemVer
+- [ ] Source Link configuration
 
 ### Deliverables
-- Complete test coverage (>80%)
-- Published NuGet packages (preview)
-- API documentation
+| Item | Location | Description |
+|------|----------|-------------|
+| CI Workflow | `.github/workflows/ci.yml` | Automated build/test |
+| Integration Tests | `tests/IndexThinking.IntegrationTests/` | Full pipeline tests |
+| Package Metadata | `Directory.Build.props` | NuGet publication ready |
+
+### Deferred to v0.15.0+
+- Performance benchmarking (BenchmarkDotNet)
+- Documentation site
+- Real LLM E2E tests (optional, with API keys)
+
+---
+
+## v0.14.0 - Provider-Specific Truncation Handling ✅
+
+**Goal**: Comprehensive handling of all provider-specific finish reasons and stop reasons.
+
+### Critical Insight
+
+Each LLM provider returns different finish/stop reasons for truncation and early termination:
+- **OpenAI**: `stop`, `length`, `content_filter`, `tool_calls`, `function_call`
+- **Anthropic**: `end_turn`, `max_tokens`, `stop_sequence`, `tool_use`, `refusal`, `model_context_window_exceeded`
+- **Google Gemini**: `STOP`, `MAX_TOKENS`, `SAFETY`, `RECITATION`
+- **GPUStack/vLLM**: OpenAI-compatible (`stop`, `length`)
+
+**Decision**: Extend TruncationDetector and TruncationReason to handle all known provider-specific reasons.
+
+### Completed Tasks
+
+#### TruncationReason Enum Extension
+- [x] `ContentFiltered` - OpenAI `content_filter`, Google `SAFETY`
+- [x] `Recitation` - Google `RECITATION` (copyright concerns)
+- [x] `Refusal` - Anthropic `refusal` (safety refusal)
+- [x] `ContextWindowExceeded` - Anthropic `model_context_window_exceeded`
+
+#### TruncationDetector Enhancement
+- [x] ChatFinishReason.Length handling (standard abstraction)
+- [x] ChatFinishReason.ContentFilter handling
+- [x] Provider-specific stop reason string matching:
+  - `max_tokens`, `MAX_TOKENS` → TokenLimit
+  - `model_context_window_exceeded` → ContextWindowExceeded
+  - `content_filter`, `SAFETY` → ContentFiltered
+  - `RECITATION` → Recitation
+  - `refusal` → Refusal
+- [x] Comprehensive XML documentation for all provider mappings
+
+#### Simulation Tests
+- [x] Truncation handling tests for all 4 providers (OpenAI, Anthropic, Google, GPUStack)
+- [x] Low max_tokens forced truncation tests
+- [x] FinishReason validation tests
+
+### Test Results
+- 674 unit tests passing (663 previous + 11 truncation tests)
+- 37 simulation tests passing across all providers
+
+### Deliverables
+| Item | Location | Description |
+|------|----------|-------------|
+| TruncationReason enum | `src/IndexThinking/Core/TruncationInfo.cs` | Extended with provider reasons |
+| TruncationDetector | `src/IndexThinking/Continuation/TruncationDetector.cs` | Provider-specific handling |
+| Simulation Tests | `tests/IndexThinking.SimulationTests/TruncationHandlingTests.cs` | Multi-provider tests |
 
 ---
 
@@ -1813,6 +1894,34 @@ LLM API (stateless):              User sends (contextual):
 - ChatClientBuilder pattern with `.UseIndexThinking().Build(sp)`
 - Environment variable based provider selection
 - Zero dependency on specific LLM providers (GPUStack/OpenAI compatible)
+
+### v0.13.0 Production Hardening - COMPLETE ✅
+
+**Scope**: CI/CD automation, integration tests, and NuGet package preparation
+
+**Completed**:
+- [x] GitHub Actions CI workflow (`.github/workflows/ci.yml`)
+- [x] Integration tests with mock `IChatClient`:
+  - ThinkingChatClient pipeline tests
+  - Context tracking integration tests
+  - State storage integration tests
+  - DI container integration tests
+- [x] NuGet package metadata in `Directory.Build.props`
+- [x] Source Link configuration for debugging
+
+### v0.14.0 Provider Truncation - COMPLETE ✅
+
+**Scope**: Provider-specific finish reason and truncation handling
+
+**Completed**:
+- [x] Extended `TruncationReason` enum:
+  - `ContentFiltered` (OpenAI content_filter, Google SAFETY)
+  - `Recitation` (Google RECITATION)
+  - `Refusal` (Anthropic refusal)
+  - `ContextWindowExceeded` (Anthropic model_context_window_exceeded)
+- [x] Enhanced `TruncationDetector` with provider-specific handling
+- [x] Simulation tests for all 4 providers (OpenAI, Anthropic, Google, GPUStack)
+- [x] 674 unit tests + 37 simulation tests passing
 
 ---
 

@@ -33,7 +33,7 @@ public sealed record TruncationInfo
 }
 
 /// <summary>
-/// Reason for response truncation.
+/// Reason for response truncation or early termination.
 /// </summary>
 public enum TruncationReason
 {
@@ -50,5 +50,29 @@ public enum TruncationReason
     IncompleteCodeBlock,
 
     /// <summary>Truncated mid-sentence.</summary>
-    MidSentence
+    MidSentence,
+
+    /// <summary>
+    /// Response blocked by content/safety filter.
+    /// OpenAI: content_filter, Google: SAFETY
+    /// </summary>
+    ContentFiltered,
+
+    /// <summary>
+    /// Response blocked due to potential copyright/recitation.
+    /// Google: RECITATION
+    /// </summary>
+    Recitation,
+
+    /// <summary>
+    /// Model refused to generate response due to safety concerns.
+    /// Anthropic: refusal
+    /// </summary>
+    Refusal,
+
+    /// <summary>
+    /// Context window exceeded (input + output too large).
+    /// Anthropic: model_context_window_exceeded
+    /// </summary>
+    ContextWindowExceeded
 }
