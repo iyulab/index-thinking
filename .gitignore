@@ -367,3 +367,4 @@ local-docs/
 .serena/
 CLAUDE.md
 tmpclaude-*
+.env

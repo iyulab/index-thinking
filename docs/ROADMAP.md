@@ -1,8 +1,17 @@
 # IndexThinking Roadmap
 
-> v0.1.0 ~ v1.0.0-beta Development Phases
+> v0.1.0 ~ v0.x.x Development Phases (Pre-1.0)
 
 This roadmap outlines the incremental development strategy for IndexThinking, a Working Memory manager for Reasoning-capable LLMs.
+
+## Version Policy (Pre-1.0)
+
+**Major version 1.0은 커뮤니티 검증 완료 후 직접 승격합니다.**
+
+현재 모든 계획은 마이너/패치 버전으로만 진행합니다:
+- `0.x.0` - 기능 추가 (breaking changes 가능)
+- `0.x.y` - 버그 수정, 개선
+- `1.0.0` - 커뮤니티 검증 완료 후 수동 승격 (로드맵에서 계획하지 않음)
 
 ---
 
@@ -94,12 +103,12 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.7.0 | Agent Framework | Internal agents, turn manager, budget tracking |
 | v0.7.5 | Client Integration | ThinkingChatClient, UseIndexThinking() |
 | v0.8.0 | Memory Integration | IMemoryProvider, FuncMemoryProvider, NullMemoryProvider |
-| **v0.8.5** | **Context-Aware Chat** | **Conversation tracking, context injection, sliding window** |
-| **v0.9.0** | **Session-Aware SDK** | **IThinkingService, userId/sessionId API** |
-| v0.10.0 | State Storage II | Redis + PostgreSQL distributed stores |
-| v0.11.0 | Resilience & Observability | Polly integration, telemetry, logging |
-| v0.12.0 | Samples & Demo | Console, Web API, Blazor applications |
-| v1.0.0-beta | Production Ready | E2E testing, documentation, performance tuning |
+| v0.8.5 | Context-Aware Chat | Conversation tracking, context injection, sliding window |
+| v0.9.0 | Context-Integrated Client | ThinkingChatClient context integration |
+| v0.10.0 | IDistributedCache | Distributed state storage via .NET abstractions |
+| v0.11.0 | Observability | OpenTelemetry integration, custom metrics |
+| v0.12.0 | Samples & Demo | Console, Web API sample applications |
+| v0.13.0 | Production Hardening | E2E testing, documentation, performance tuning |
 
 ---
 
@@ -1460,67 +1469,80 @@ builder.Services.AddOpenTelemetry()
 
 ---
 
-## v0.12.0 - Samples & Demo
+## v0.12.0 - Sample Applications
 
-**Goal**: Provide comprehensive sample applications for developers.
+**Goal**: Provide working sample applications demonstrating IndexThinking usage.
+
+### Critical Insight
+
+Original plan included Blazor, Docker Compose, and documentation site.
+After review:
+- Blazor requires significant frontend complexity → Deferred
+- Docker Compose is infrastructure concern → Deferred  
+- Documentation site is separate effort → Deferred
+
+**Decision**: Focus on Console + Minimal API samples that demonstrate core features.
+
+### Environment Configuration
+
+Samples use `.env` file for API keys (GPUStack, OpenAI, Anthropic, Google):
+```bash
+GPUSTACK_URL=http://...
+GPUSTACK_APIKEY=...
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AIza...
+```
 
 ### Tasks
 
-#### Console Chat Application
-- [ ] Simple CLI chat with thinking visualization
-- [ ] Multi-turn conversation demo
-- [ ] Continuation handling demo
-- [ ] Budget management demo
+#### Console Chat Sample
+- [ ] Multi-provider support (GPUStack, OpenAI, Anthropic)
+- [ ] Thinking content visualization (colored output)
+- [ ] Multi-turn conversation with context
+- [ ] Continuation handling demonstration
+- [ ] Token usage display
 
-#### ASP.NET Core Web API
-- [ ] REST API with streaming support
+#### Minimal API Sample
+- [ ] Chat endpoint with IndexThinking pipeline
+- [ ] Health check endpoints (storage, providers)
+- [ ] OpenTelemetry/metrics integration
 - [ ] Swagger/OpenAPI documentation
-- [ ] Health check endpoints
-- [ ] Rate limiting example
-
-#### Blazor Interactive Demo
-- [ ] Real-time thinking visualization
-- [ ] Token budget visualization
-- [ ] Provider comparison demo
-- [ ] State inspection UI
-
-#### Documentation
-- [ ] Getting started guide
-- [ ] Provider-specific setup guides
-- [ ] Best practices guide
-- [ ] Troubleshooting guide
 
 ### Test Requirements
-- [ ] Sample applications compile and run
+- [ ] `dotnet build` succeeds for all samples
+- [ ] Samples run with mock provider (no real API calls in tests)
 - [ ] API endpoints return expected responses
-- [ ] Blazor UI renders correctly
 
 ### Deliverables
 | Sample | Location | Description |
 |--------|----------|-------------|
-| Console App | `samples/ConsoleChat/` | CLI demonstration |
-| Web API | `samples/WebApi/` | REST API example |
-| Blazor Demo | `samples/BlazorDemo/` | Interactive web UI |
-| Docker Compose | `samples/docker-compose.yml` | Full stack deployment |
+| Console App | `samples/IndexThinking.Samples.Console/` | CLI chat demo |
+| Web API | `samples/IndexThinking.Samples.WebApi/` | Minimal API demo |
+
+### Deferred to v0.13.0+
+- Blazor Interactive Demo
+- Docker Compose
+- Documentation site
 
 ---
 
-## v1.0.0-beta - Production Ready
+## v0.13.0 - Production Hardening
 
 **Goal**: Comprehensive testing, documentation, and production hardening.
 
 ### Tasks
-- [ ] End-to-end test suite
-- [ ] Performance testing
+- [ ] End-to-end test suite with real LLM providers
+- [ ] Performance benchmarking
 - [ ] Security review
-- [ ] Documentation site
-- [ ] CI/CD pipeline
+- [ ] API documentation site
+- [ ] CI/CD pipeline with automated testing
 - [ ] Performance optimization
 
 ### Deliverables
 - Complete test coverage (>80%)
-- Published NuGet packages
-- Documentation site
+- Published NuGet packages (preview)
+- API documentation
 
 ---
 
@@ -1551,7 +1573,7 @@ v0.1.0 Foundation
     │                                                               │
     │                                                               └── v0.12.0 Samples & Demo
     │                                                                       │
-    └───────────────────────────────────────────────────────────────────────┴── v1.0.0-beta
+    └───────────────────────────────────────────────────────────────────────┴── v0.13.0 Production Hardening
 ```
 
 ---
@@ -1775,12 +1797,13 @@ LLM API (stateless):              User sends (contextual):
 
 ---
 
-## Version Policy
+## Version Policy (Detailed)
 
 - **Minor versions** (0.x.0): Feature additions, may include breaking changes
-- **Patch versions** (0.x.y): Bug fixes, no breaking changes
-- **Beta** (1.0.0-beta): Feature complete, API stabilization
-- **Stable** (1.0.0): Production ready, semantic versioning begins
+- **Patch versions** (0.x.y): Bug fixes, improvements, no breaking changes
+- **Major version** (1.0.0): 커뮤니티 검증 완료 후 수동 승격 (로드맵에서 계획하지 않음)
+
+> Note: 1.0.0 승격은 실제 프로덕션 사용 사례와 커뮤니티 피드백을 통해 API 안정성이 검증된 후에만 진행됩니다.
 
 ---
 
