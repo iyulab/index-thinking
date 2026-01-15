@@ -91,9 +91,11 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.4.0 | Truncation Handling | Detection, continuation, recovery logic |
 | v0.5.0 | State Storage I | InMemory + SQLite state stores |
 | v0.6.0 | Reasoning Parsers II | Gemini + DeepSeek/Open-source parsers |
-| v0.7.0 | Agent Framework | Internal agents, orchestrator, task decomposition |
-| v0.8.0 | Memory Integration | Memory-Indexer integration |
-| v0.9.0 | SDK & Public API | Consumer-facing SDK, DI extensions |
+| v0.7.0 | Agent Framework | Internal agents, turn manager, budget tracking |
+| v0.7.5 | Client Integration | ThinkingChatClient, UseIndexThinking() |
+| v0.8.0 | Memory Integration | Memory-Indexer integration, IMemoryProvider |
+| **v0.8.5** | **Query Enhancement** | **Context tracking, ambiguous query resolution** |
+| **v0.9.0** | **Session-Aware SDK** | **IThinkingService, userId/sessionId API** |
 | v0.10.0 | State Storage II | Redis + PostgreSQL distributed stores |
 | v0.11.0 | Resilience & Observability | Polly integration, telemetry, logging |
 | v0.12.0 | Samples & Demo | Console, Web API, Blazor applications |
@@ -1166,7 +1168,7 @@ src/IndexThinking/
 
 ## v0.8.0 - Memory Integration
 
-**Goal**: Integrate with Memory-Indexer.
+**Goal**: Integrate with Memory-Indexer for long-term memory recall.
 
 ### Tasks
 - [ ] Define `IMemoryProvider` interface
@@ -1183,23 +1185,154 @@ src/IndexThinking/
 
 ---
 
-## v0.9.0 - SDK & Public API
+## v0.8.5 - Query Enhancement
 
-**Goal**: Create developer-friendly SDK.
+**Goal**: Transform ambiguous user messages into clear, context-aware prompts.
+
+### Motivation
+
+LLM APIs are stateless, but users speak in context:
+```
+User sends:     "아까 그거 다시 해줘"
+LLM needs:      "Python DataFrame을 CSV로 저장하는 작업을 다시 실행해주세요"
+```
+
+IndexThinking bridges this gap by:
+1. Tracking conversation context (recent topics, entities)
+2. Resolving ambiguous references ("이거", "아까 그거", "더 빠르게")
+3. Enriching queries with relevant memory (via v0.8.0 IMemoryProvider)
+
+### Core Interfaces
+
+```csharp
+/// <summary>
+/// Tracks conversation context within a session.
+/// </summary>
+public interface IContextTracker
+{
+    void Track(string sessionId, ChatMessage message, ChatResponse response);
+    ConversationContext GetContext(string sessionId);
+}
+
+/// <summary>
+/// Enriches user messages with context and memory.
+/// </summary>
+public interface IQueryEnricher
+{
+    Task<IList<ChatMessage>> EnrichAsync(
+        ThinkingContext context,
+        IList<ChatMessage> messages,
+        CancellationToken ct = default);
+}
+
+public record ConversationContext
+{
+    public IReadOnlyList<string> RecentTopics { get; init; }
+    public IReadOnlyDictionary<string, string> Entities { get; init; }  // "그 파일" → "app.py"
+    public string? LastAction { get; init; }  // "Python 코드 실행"
+}
+```
 
 ### Tasks
-- [ ] Design fluent API for `ThinkingRequest`
-- [ ] Implement `IThinkingService` facade
-- [ ] Create DI extension methods
-- [ ] Implement streaming response support
-- [ ] Add OpenTelemetry activity support
+- [ ] Define `IContextTracker` interface
+- [ ] Implement `InMemoryContextTracker`
+- [ ] Define `IQueryEnricher` interface
+- [ ] Implement `DefaultQueryEnricher`
+  - Pronoun resolution ("이거" → actual entity)
+  - Action reference ("아까 그거" → last action)
+  - Topic continuation detection
+- [ ] Define `IFollowUpGenerator` interface
+- [ ] Implement `DefaultFollowUpGenerator`
+  - Context-aware follow-up question suggestions
+  - Response-based next action recommendations
+- [ ] Integrate with `IMemoryProvider` (v0.8.0)
+- [ ] Add to ThinkingChatClient pipeline (pre + post processing)
 
 ### Test Requirements
-- [ ] API usability tests
-- [ ] Streaming tests
+- [ ] Pronoun resolution tests
+- [ ] Action reference resolution tests
+- [ ] Topic detection tests
+- [ ] Integration with memory recall
+
+### Configuration
+
+```csharp
+.UseIndexThinking(options =>
+{
+    options.EnableQueryEnrichment = true;     // Enable pre-processing
+    options.ContextWindowSize = 5;            // Track last 5 turns
+    options.ResolvePronouns = true;           // "이거" → entity
+    options.ResolveActionReferences = true;   // "아까 그거" → action
+})
+```
 
 ### Deliverables
-- `IndexThinking.SDK` public API
+- `IndexThinking.Context` namespace
+- Query enrichment pipeline in ThinkingChatClient
+
+---
+
+## v0.9.0 - SDK & Public API (Session-Aware)
+
+**Goal**: Create developer-friendly, session-aware SDK that eliminates chat app boilerplate.
+
+### Vision
+
+```csharp
+// What developers want to write:
+var response = await thinking.ChatAsync(
+    userId: "user-123",
+    sessionId: "session-456",
+    message: "아까 그거 다시 해줘"
+);
+
+// IndexThinking handles everything:
+// - Session history loading
+// - Context interpretation ("아까 그거" → actual meaning)
+// - Prompt optimization
+// - LLM request with truncation handling
+// - Response parsing and state saving
+```
+
+### Core Interface
+
+```csharp
+public interface IThinkingService
+{
+    /// <summary>
+    /// Session-aware chat that handles all complexity.
+    /// </summary>
+    Task<ThinkingResponse> ChatAsync(
+        string userId,
+        string sessionId,
+        string message,
+        ChatOptions? options = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Streaming version.
+    /// </summary>
+    IAsyncEnumerable<ThinkingResponseUpdate> ChatStreamingAsync(...);
+}
+```
+
+### Tasks
+- [ ] Design `IThinkingService` facade
+- [ ] Implement session loading/saving
+- [ ] Integrate query enhancement (v0.8.5)
+- [ ] Integrate memory recall (v0.8.0)
+- [ ] Add streaming support
+- [ ] Add OpenTelemetry activity support
+- [ ] Create DI extension methods
+
+### Test Requirements
+- [ ] End-to-end session tests
+- [ ] Streaming tests
+- [ ] Multi-user isolation tests
+
+### Deliverables
+- `IndexThinking.SDK` with `IThinkingService`
+- Session-aware API
 
 ---
 
@@ -1484,6 +1617,30 @@ Scope: core, parsers, storage, agents, sdk, samples
 - Memory-Indexer = Long-term Memory (past knowledge)
 - IndexThinking = Working Memory (current reasoning)
 - Integration is optional (works without Memory-Indexer)
+
+### v0.8.5 Query Enhancement - PLANNED
+
+**Scope**: Transform ambiguous messages into context-aware prompts
+
+**The Problem**:
+```
+LLM API (stateless):              User sends (contextual):
+─────────────────────             ─────────────────────────
+{ "messages": [...] }             "아까 그거 다시 해줘"
+                                  "이거 더 빠르게"
+                                  "그 파일 수정해줘"
+```
+
+**Components to Implement**:
+- [ ] `IContextTracker` - Track recent topics, entities, actions
+- [ ] `IQueryEnricher` - Resolve pronouns, action references
+- [ ] Pre-processing pipeline in ThinkingChatClient
+- [ ] Integration with IMemoryProvider
+
+**Key Design Decisions**:
+- Zero-config default (basic context tracking)
+- Optional memory integration for richer context
+- Pronoun/reference resolution is language-aware
 
 ---
 

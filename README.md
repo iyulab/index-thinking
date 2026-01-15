@@ -1,26 +1,69 @@
 # IndexThinking
 
-> **Zero-config middleware that handles LLM response truncation, token budgeting, and reasoning extraction - so you don't have to.**
+> **Build better chat apps, not infrastructure.**
+> Zero-config SDK that handles the repetitive-but-hard parts of LLM integration: query preprocessing, response continuation, follow-up suggestions, and more.
 
 [![NuGet](https://img.shields.io/nuget/v/IndexThinking.svg)](https://www.nuget.org/packages/IndexThinking)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/)
 
+## Design Philosophy
+
+- **Zero-configuration by default** - Works out of the box, does the right thing automatically
+- **Extensible for power users** - Every component is configurable and replaceable
+- **Solves hard problems** - Handles tasks that are repetitive but difficult to do well
+
 ## The Problem
 
-Every LLM application deals with the same tedious issues:
+LLM APIs are stateless. Every chat app reimplements the same infrastructure:
 
-- **Response Truncation**: Output hits token limit → you manually implement "continue" logic
-- **Provider Differences**: OpenAI uses `reasoning`, Anthropic uses `thinking` blocks, Gemini has `thoughtSignature` → you write parsing code for each
-- **Token Tracking**: Need to track costs and usage → you manually aggregate across requests
-- **State Management**: Multi-turn reasoning requires state preservation → you build session handling
+```
+LLM API expects:                    But users send:
+──────────────────                  ─────────────────
+{                                   "아까 그거 다시 해줘"
+  "messages": [                     "이거 더 빠르게"
+    // YOU manage history           "그 파일 수정해줘"
+    // YOU handle summarization
+    // YOU interpret context        → Ambiguous, contextual,
+    // YOU detect truncation          requires session state
+    // YOU parse reasoning
+  ]
+}
+```
 
-This is 50+ lines of boilerplate that every LLM app reimplements.
+**Every chat app developer writes:**
+- Session/history management (sliding window, summarization)
+- Context interpretation ("아까 그거" → actual meaning)
+- Truncation handling (continue logic, fragment merging)
+- Provider-specific parsing (5+ different reasoning formats)
+- Token budget tracking
+- Follow-up question suggestions
+
+These are **repetitive but hard to do well**. IndexThinking handles them for you.
 
 ## The Solution
 
+### Vision: Session-Aware API (Coming in v0.9.0)
+
 ```csharp
-// Before: 50+ lines of truncation handling, provider-specific parsing, token tracking...
-// After: 1 line
+// What you send:
+var response = await thinking.ChatAsync(
+    userId: "user-123",
+    sessionId: "session-456",
+    message: "아까 그거 다시 해줘"
+);
+
+// What IndexThinking does internally:
+// 1. Load session history
+// 2. Interpret "아까 그거" → "Python DataFrame 저장 작업"
+// 3. Build optimized prompt with context
+// 4. Send to LLM, handle truncation
+// 5. Parse reasoning, track tokens
+// 6. Save updated session state
+```
+
+### Current: Middleware API (Available Now)
+
+```csharp
 var client = new ChatClientBuilder(innerClient)
     .UseIndexThinking()
     .Build();
@@ -95,6 +138,9 @@ var result = response.GetTurnResult();          // Full turn info
 | **Token Budgeting** | Manual counting per provider | Auto-tracked |
 | **State Continuity** | Custom session management | Built-in |
 | **JSON/Code Recovery** | Manual truncated content repair | Automatic |
+| **Context Interpretation** | Manual "아까 그거" resolution | Coming v0.8.5 |
+| **Follow-up Suggestions** | Manual question generation | Coming v0.8.5 |
+| **Session Management** | Manual history, summarization | Coming v0.9.0 |
 
 ## Supported Providers
 
