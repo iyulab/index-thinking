@@ -63,39 +63,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check if version changed
-        id: version-check
-        run: |
-          if git diff HEAD~1 --name-only | grep -q 'Directory.Build.props'; then
-            PREV_VERSION=$(git show HEAD~1:Directory.Build.props | grep -oP '(?<=<Version>)[^<]+' || echo "0.0.0")
-            CURR_VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
-            if [ "$PREV_VERSION" != "$CURR_VERSION" ]; then
-              echo "changed=true" >> $GITHUB_OUTPUT
-              echo "Version changed: $PREV_VERSION -> $CURR_VERSION"
-            else
-              echo "changed=false" >> $GITHUB_OUTPUT
-              echo "Version unchanged: $CURR_VERSION"
-            fi
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "Directory.Build.props not modified"
-          fi
-
-      - name: Skip publish (no version change)
-        if: steps.version-check.outputs.changed != 'true' && github.event_name != 'workflow_dispatch'
-        run: echo "Skipping publish - no version change detected"
 
       - name: Setup .NET
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Extract version from Directory.Build.props
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         id: version
         run: |
           VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props | head -1)
@@ -103,21 +77,17 @@ jobs:
           echo "Detected version: $VERSION"
 
       - name: Build Release
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: dotnet build --configuration Release
 
       - name: Pack NuGet packages
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           dotnet pack src/IndexThinking/IndexThinking.csproj --configuration Release --no-build --output ./nupkgs
           dotnet pack src/IndexThinking.SDK/IndexThinking.SDK.csproj --configuration Release --no-build --output ./nupkgs
 
       - name: List packages
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: ls -la ./nupkgs
 
       - name: Publish to NuGet.org
-        if: steps.version-check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
         run: |
           dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
         env:
