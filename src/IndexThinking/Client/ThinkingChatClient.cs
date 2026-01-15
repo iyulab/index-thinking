@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Context;
 using IndexThinking.Core;
+using IndexThinking.Diagnostics;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Client;
@@ -27,6 +29,7 @@ public class ThinkingChatClient : DelegatingChatClient
     private readonly ThinkingChatClientOptions _options;
     private readonly IContextTracker? _contextTracker;
     private readonly IContextInjector? _contextInjector;
+    private readonly IndexThinkingMeter? _meter;
 
     /// <summary>
     /// Metadata key for storing <see cref="ThinkingContent"/> in the response.
@@ -51,18 +54,21 @@ public class ThinkingChatClient : DelegatingChatClient
     /// <param name="options">Configuration options.</param>
     /// <param name="contextTracker">Optional context tracker for conversation management.</param>
     /// <param name="contextInjector">Optional context injector for message enrichment.</param>
+    /// <param name="meter">Optional meter for IndexThinking-specific metrics.</param>
     public ThinkingChatClient(
         IChatClient innerClient,
         IThinkingTurnManager turnManager,
         ThinkingChatClientOptions? options = null,
         IContextTracker? contextTracker = null,
-        IContextInjector? contextInjector = null)
+        IContextInjector? contextInjector = null,
+        IndexThinkingMeter? meter = null)
         : base(innerClient)
     {
         _turnManager = turnManager ?? throw new ArgumentNullException(nameof(turnManager));
         _options = options ?? new ThinkingChatClientOptions();
         _contextTracker = contextTracker;
         _contextInjector = contextInjector;
+        _meter = meter;
     }
 
     /// <inheritdoc />
@@ -89,6 +95,12 @@ public class ThinkingChatClient : DelegatingChatClient
 
         // Track conversation if enabled
         TrackConversation(sessionId, messageList, turnResult.Response);
+
+        // Add IndexThinking-specific telemetry tags to current Activity
+        AddTelemetryTags(turnResult);
+
+        // Record metrics if meter is configured
+        _meter?.RecordTurn(turnResult, sessionId);
 
         // Enrich response with thinking metadata
         return EnrichResponse(turnResult);
@@ -182,6 +194,40 @@ public class ThinkingChatClient : DelegatingChatClient
         if (lastUserMessage is not null)
         {
             _contextTracker.Track(sessionId, lastUserMessage, response);
+        }
+    }
+
+
+    /// <summary>
+    /// Adds IndexThinking-specific telemetry tags to the current Activity.
+    /// </summary>
+    /// <remarks>
+    /// These tags complement the OpenTelemetry GenAI semantic conventions
+    /// by providing IndexThinking-specific metrics. Use with UseOpenTelemetry()
+    /// in the chat client pipeline for full observability.
+    /// </remarks>
+    private static void AddTelemetryTags(TurnResult turnResult)
+    {
+        var activity = Activity.Current;
+        if (activity is null)
+        {
+            return;
+        }
+
+        // Add IndexThinking-specific tags using namespaced keys
+        activity.SetTag("indexthinking.thinking_tokens", turnResult.Metrics.ThinkingTokens);
+        activity.SetTag("indexthinking.continuation_count", turnResult.Metrics.ContinuationCount);
+        activity.SetTag("indexthinking.truncation_detected", turnResult.WasTruncated);
+        activity.SetTag("indexthinking.duration_ms", turnResult.Metrics.Duration.TotalMilliseconds);
+
+        if (turnResult.Metrics.DetectedComplexity.HasValue)
+        {
+            activity.SetTag("indexthinking.complexity", turnResult.Metrics.DetectedComplexity.Value.ToString().ToLowerInvariant());
+        }
+
+        if (turnResult.HasThinkingContent)
+        {
+            activity.SetTag("indexthinking.has_thinking_content", true);
         }
     }
 

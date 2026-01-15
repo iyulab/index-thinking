@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -6,6 +7,7 @@ using IndexThinking.Agents;
 using IndexThinking.Context;
 using IndexThinking.Continuation;
 using IndexThinking.Core;
+using IndexThinking.Diagnostics;
 using IndexThinking.Memory;
 using IndexThinking.Stores;
 
@@ -443,5 +445,40 @@ public static class ServiceCollectionExtensions
         configure(options);
 
         return services.AddIndexThinkingHealthChecks(options);
+    }
+
+    // ========================================
+    // Metrics (v0.11.0)
+    // ========================================
+
+    /// <summary>
+    /// Adds IndexThinking metrics with the default meter factory from DI.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This method registers <see cref="IndexThinkingMeter"/> as a singleton,
+    /// using the <see cref="IMeterFactory"/> from DI if available.
+    /// </para>
+    /// <para>
+    /// To enable these metrics in OpenTelemetry:
+    /// <code>
+    /// builder.Services.AddOpenTelemetry()
+    ///     .WithMetrics(metrics => metrics.AddMeter("IndexThinking"));
+    /// </code>
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingMetrics(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IndexThinkingMeter>(sp =>
+        {
+            var meterFactory = sp.GetService<IMeterFactory>();
+            return new IndexThinkingMeter(meterFactory);
+        });
+
+        return services;
     }
 }

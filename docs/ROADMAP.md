@@ -1401,24 +1401,62 @@ services.AddHealthChecks()
 
 ---
 
-## v0.11.0 - Resilience & Observability
+## v0.11.0 - Observability Integration ✅
 
-**Goal**: Production-ready resilience and observability.
+**Goal**: IndexThinking-specific telemetry that complements M.E.AI observability.
 
-### Tasks
-- [ ] Integrate Polly for resilience
-- [ ] Implement retry strategies
-- [ ] Add comprehensive logging
-- [ ] Implement metrics
-- [ ] Add tracing
+### Critical Insight
 
-### Test Requirements
-- [ ] Retry behavior tests
-- [ ] Circuit breaker tests
+Original plan called for Polly resilience, custom logging, and full metrics/tracing.
+Research revealed:
+- `Microsoft.Extensions.AI` already provides `UseOpenTelemetry()` and `UseLogging()`
+- Polly resilience belongs at `HttpClient` level, not chat client level
+- We should only add **IndexThinking-specific** telemetry data
+
+**Decision**: Add Activity tags and Meter for IndexThinking metrics, defer resilience.
+
+### Completed Tasks
+- [x] Add Activity tags to ThinkingChatClient (integrates with UseOpenTelemetry):
+  - `indexthinking.thinking_tokens`
+  - `indexthinking.continuation_count`
+  - `indexthinking.truncation_detected`
+  - `indexthinking.duration_ms`
+  - `indexthinking.complexity`
+  - `indexthinking.has_thinking_content`
+- [x] Create `IndexThinkingMeter` with .NET Meter API:
+  - `indexthinking.turns.total` (Counter)
+  - `indexthinking.continuations.total` (Counter)
+  - `indexthinking.truncations.total` (Counter)
+  - `indexthinking.tokens.thinking` (Counter)
+  - `indexthinking.turn.duration` (Histogram)
+- [x] Add DI extension: `AddIndexThinkingMetrics()`
+- [x] Unit tests
+
+### Usage Example
+```csharp
+// Recommended pipeline with full observability
+var client = new ChatClientBuilder(innerClient)
+    .UseOpenTelemetry()          // M.E.AI: GenAI semantic conventions
+    .UseLogging(loggerFactory)   // M.E.AI: ILogger integration
+    .UseIndexThinking()          // IndexThinking: adds custom tags/metrics
+    .Build();
+
+// Configure OpenTelemetry to collect IndexThinking metrics
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics => metrics
+        .AddMeter("Microsoft.Extensions.AI")  // M.E.AI metrics
+        .AddMeter("IndexThinking"));           // IndexThinking metrics
+```
 
 ### Deliverables
-- `IndexThinking.Resilience` namespace
-- Grafana dashboard templates
+- `IndexThinkingMeter` in `IndexThinking.Diagnostics` namespace
+- Activity tags in `ThinkingChatClient`
+- DI registration helper
+
+### Deferred to Later Versions
+- Polly resilience → HttpClient/provider level (out of IndexThinking scope)
+- Custom logging wrapper → Use M.E.AI's UseLogging() instead
+- Grafana dashboard templates → Samples phase (v0.12.0)
 
 ---
 
@@ -1702,6 +1740,38 @@ LLM API (stateless):              User sends (contextual):
 - Sliding window pattern (like LangChain/LangChain4j)
 - Configurable injection limits for token management
 - Thread-safe implementation with cleanup timer
+
+### v0.9.0 Context-Integrated Client - COMPLETE ✅
+
+**Scope**: Integrate conversation context into ThinkingChatClient
+
+**Completed**:
+- [x] Integrate IContextTracker/IContextInjector into ThinkingChatClient
+- [x] Add context options to ThinkingChatClientOptions
+- [x] Update UseIndexThinking() to resolve context services from DI
+- [x] Add convenience methods (ChatAsync, SendAsync, WithSession)
+- [x] 606 unit tests passing (559 previous + 47 context integration)
+
+### v0.10.0 IDistributedCache Integration - COMPLETE ✅
+
+**Scope**: Distributed deployment via .NET standard abstractions
+
+**Completed**:
+- [x] `DistributedCacheThinkingStateStore` wrapping any IDistributedCache
+- [x] `DistributedCacheStateStoreOptions` with expiration controls
+- [x] `ThinkingStateStoreHealthCheck` (IHealthCheck implementation)
+- [x] DI extensions: `AddIndexThinkingDistributedStorage()`, `AddIndexThinkingHealthChecks()`
+- [x] 650 unit tests passing (606 previous + 44 distributed storage)
+
+### v0.11.0 Observability Integration - COMPLETE ✅
+
+**Scope**: IndexThinking-specific telemetry complementing M.E.AI
+
+**Completed**:
+- [x] Activity tags in ThinkingChatClient for OpenTelemetry integration
+- [x] `IndexThinkingMeter` with .NET Meter API
+- [x] DI extension: `AddIndexThinkingMetrics()`
+- [x] 663 unit tests passing (650 previous + 13 observability)
 
 ---
 
