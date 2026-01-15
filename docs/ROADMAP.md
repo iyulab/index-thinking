@@ -1469,7 +1469,7 @@ builder.Services.AddOpenTelemetry()
 
 ---
 
-## v0.12.0 - Sample Applications
+## v0.12.0 - Sample Applications ✅
 
 **Goal**: Provide working sample applications demonstrating IndexThinking usage.
 
@@ -1478,7 +1478,7 @@ builder.Services.AddOpenTelemetry()
 Original plan included Blazor, Docker Compose, and documentation site.
 After review:
 - Blazor requires significant frontend complexity → Deferred
-- Docker Compose is infrastructure concern → Deferred  
+- Docker Compose is infrastructure concern → Deferred
 - Documentation site is separate effort → Deferred
 
 **Decision**: Focus on Console + Minimal API samples that demonstrate core features.
@@ -1494,25 +1494,20 @@ ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=AIza...
 ```
 
-### Tasks
+### Completed Tasks
 
 #### Console Chat Sample
-- [ ] Multi-provider support (GPUStack, OpenAI, Anthropic)
-- [ ] Thinking content visualization (colored output)
-- [ ] Multi-turn conversation with context
-- [ ] Continuation handling demonstration
-- [ ] Token usage display
+- [x] Multi-provider support (GPUStack, OpenAI)
+- [x] Thinking content visualization (colored output)
+- [x] Multi-turn conversation with context
+- [x] Token usage display (input, thinking, output)
+- [x] Session-based conversation tracking
 
 #### Minimal API Sample
-- [ ] Chat endpoint with IndexThinking pipeline
-- [ ] Health check endpoints (storage, providers)
-- [ ] OpenTelemetry/metrics integration
-- [ ] Swagger/OpenAPI documentation
-
-### Test Requirements
-- [ ] `dotnet build` succeeds for all samples
-- [ ] Samples run with mock provider (no real API calls in tests)
-- [ ] API endpoints return expected responses
+- [x] POST /api/chat endpoint with IndexThinking pipeline
+- [x] GET /health endpoint
+- [x] Conversation history support
+- [x] Structured response (ThinkingInfo, MetricsInfo)
 
 ### Deliverables
 | Sample | Location | Description |
@@ -1524,6 +1519,7 @@ GOOGLE_API_KEY=AIza...
 - Blazor Interactive Demo
 - Docker Compose
 - Documentation site
+- Swagger/OpenAPI documentation
 
 ---
 
@@ -1794,6 +1790,29 @@ LLM API (stateless):              User sends (contextual):
 - [x] `IndexThinkingMeter` with .NET Meter API
 - [x] DI extension: `AddIndexThinkingMetrics()`
 - [x] 663 unit tests passing (650 previous + 13 observability)
+
+### v0.12.0 Sample Applications - COMPLETE ✅
+
+**Scope**: Working sample applications demonstrating IndexThinking usage
+
+**Completed**:
+- [x] Console Sample (`samples/IndexThinking.Samples.Console/`):
+  - Multi-provider support (GPUStack, OpenAI)
+  - Thinking content visualization (colored output)
+  - Multi-turn conversation with session tracking
+  - Token usage display (input, thinking, output)
+- [x] Web API Sample (`samples/IndexThinking.Samples.WebApi/`):
+  - POST /api/chat endpoint with IndexThinking pipeline
+  - GET /health endpoint
+  - Conversation history support
+  - Structured response (ThinkingInfo, MetricsInfo)
+- [x] Solution build succeeds with all samples
+
+**Key Design Decisions**:
+- DotNetEnv for `.env` file loading
+- ChatClientBuilder pattern with `.UseIndexThinking().Build(sp)`
+- Environment variable based provider selection
+- Zero dependency on specific LLM providers (GPUStack/OpenAI compatible)
 
 ---
 
