@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using IndexThinking.Abstractions;
 using IndexThinking.Agents;
+using IndexThinking.Context;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
 
@@ -7,7 +9,7 @@ namespace IndexThinking.Client;
 
 /// <summary>
 /// A delegating chat client that orchestrates thinking turns with complexity estimation,
-/// budget tracking, and continuation handling.
+/// budget tracking, continuation handling, and conversation context management.
 /// </summary>
 /// <remarks>
 /// This client wraps any <see cref="IChatClient"/> and provides:
@@ -16,12 +18,15 @@ namespace IndexThinking.Client;
 ///   <item>Task complexity estimation and budget management</item>
 ///   <item>Reasoning content extraction and parsing</item>
 ///   <item>Turn state management</item>
+///   <item>Conversation context tracking and injection (v0.9.0)</item>
 /// </list>
 /// </remarks>
 public class ThinkingChatClient : DelegatingChatClient
 {
     private readonly IThinkingTurnManager _turnManager;
     private readonly ThinkingChatClientOptions _options;
+    private readonly IContextTracker? _contextTracker;
+    private readonly IContextInjector? _contextInjector;
 
     /// <summary>
     /// Metadata key for storing <see cref="ThinkingContent"/> in the response.
@@ -44,14 +49,20 @@ public class ThinkingChatClient : DelegatingChatClient
     /// <param name="innerClient">The inner client to delegate to.</param>
     /// <param name="turnManager">The turn manager for orchestrating thinking turns.</param>
     /// <param name="options">Configuration options.</param>
+    /// <param name="contextTracker">Optional context tracker for conversation management.</param>
+    /// <param name="contextInjector">Optional context injector for message enrichment.</param>
     public ThinkingChatClient(
         IChatClient innerClient,
         IThinkingTurnManager turnManager,
-        ThinkingChatClientOptions? options = null)
+        ThinkingChatClientOptions? options = null,
+        IContextTracker? contextTracker = null,
+        IContextInjector? contextInjector = null)
         : base(innerClient)
     {
         _turnManager = turnManager ?? throw new ArgumentNullException(nameof(turnManager));
         _options = options ?? new ThinkingChatClientOptions();
+        _contextTracker = contextTracker;
+        _contextInjector = contextInjector;
     }
 
     /// <inheritdoc />
@@ -63,14 +74,21 @@ public class ThinkingChatClient : DelegatingChatClient
         ArgumentNullException.ThrowIfNull(messages);
 
         var messageList = messages as IList<ChatMessage> ?? messages.ToList();
+        var sessionId = GetSessionId(options);
+
+        // Inject conversation context if enabled
+        var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
         // Create thinking context from messages and options
-        var context = CreateContext(messageList, options, cancellationToken);
+        var context = CreateContext(enrichedMessages, options, cancellationToken, sessionId);
 
         // Process through turn manager
         var turnResult = await _turnManager.ProcessTurnAsync(
             context,
             async (msgs, ct) => await base.GetResponseAsync(msgs, options, ct));
+
+        // Track conversation if enabled
+        TrackConversation(sessionId, messageList, turnResult.Response);
 
         // Enrich response with thinking metadata
         return EnrichResponse(turnResult);
@@ -104,11 +122,9 @@ public class ThinkingChatClient : DelegatingChatClient
     private ThinkingContext CreateContext(
         IList<ChatMessage> messages,
         ChatOptions? options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string sessionId)
     {
-        // Extract session ID from options or generate new one
-        var sessionId = GetSessionId(options);
-
         var context = ThinkingContext.Create(sessionId, messages)
             .WithBudget(_options.DefaultBudget)
             .WithCancellation(cancellationToken);
@@ -130,6 +146,43 @@ public class ThinkingChatClient : DelegatingChatClient
         }
 
         return context;
+    }
+
+    /// <summary>
+    /// Injects conversation context into the messages.
+    /// </summary>
+    private IList<ChatMessage> InjectConversationContext(string sessionId, IList<ChatMessage> messages)
+    {
+        if (!_options.EnableContextInjection || _contextTracker is null || _contextInjector is null)
+        {
+            return messages;
+        }
+
+        var conversationContext = _contextTracker.GetContext(sessionId);
+        if (!conversationContext.HasHistory)
+        {
+            return messages;
+        }
+
+        return _contextInjector.InjectContext(messages, conversationContext);
+    }
+
+    /// <summary>
+    /// Tracks the conversation turn.
+    /// </summary>
+    private void TrackConversation(string sessionId, IList<ChatMessage> originalMessages, ChatResponse response)
+    {
+        if (!_options.EnableContextTracking || _contextTracker is null)
+        {
+            return;
+        }
+
+        // Track the last user message with the response
+        var lastUserMessage = originalMessages.LastOrDefault(m => m.Role == ChatRole.User);
+        if (lastUserMessage is not null)
+        {
+            _contextTracker.Track(sessionId, lastUserMessage, response);
+        }
     }
 
     /// <summary>

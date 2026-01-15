@@ -1283,67 +1283,71 @@ services.AddIndexThinkingContext(
 
 ---
 
-## v0.9.0 - SDK & Public API (Session-Aware)
+## v0.9.0 - Context-Integrated Client
 
-**Goal**: Create developer-friendly, session-aware SDK that eliminates chat app boilerplate.
+**Goal**: Integrate conversation context into ThinkingChatClient for seamless session-aware chat.
 
-### Vision
+### Philosophy (Revised from Original Plan)
 
-```csharp
-// What developers want to write:
-var response = await thinking.ChatAsync(
-    userId: "user-123",
-    sessionId: "session-456",
-    message: "Do that thing again"
-);
+**Original approach** (IThinkingService facade):
+- Create new `IThinkingService` interface
+- Separate abstraction from IChatClient
 
-// IndexThinking handles everything:
-// - Session history loading
-// - Context interpretation ("that thing" → actual meaning)
-// - Prompt optimization
-// - LLM request with truncation handling
-// - Response parsing and state saving
-```
+**Critical insight** from M.E.AI patterns:
+- Microsoft.Extensions.AI already defines IChatClient as the standard
+- Adding another facade violates "Extend, Don't Replace" principle
+- Semantic Kernel builds ON IChatClient, not beside it
 
-### Core Interface
+**New approach** (Context-Integrated Client):
+- Enhance existing `ThinkingChatClient` with context support
+- Add convenience extension methods for common patterns
+- Use DI to automatically inject context services
+
+### API Design
 
 ```csharp
-public interface IThinkingService
-{
-    /// <summary>
-    /// Session-aware chat that handles all complexity.
-    /// </summary>
-    Task<ThinkingResponse> ChatAsync(
-        string userId,
-        string sessionId,
-        string message,
-        ChatOptions? options = null,
-        CancellationToken ct = default);
+// Simple session-aware chat (convenience method)
+var response = await client.ChatAsync("session-123", "Do that again");
 
-    /// <summary>
-    /// Streaming version.
-    /// </summary>
-    IAsyncEnumerable<ThinkingResponseUpdate> ChatStreamingAsync(...);
-}
+// Or with explicit options
+var options = ThinkingChatClientExtensions.WithSession("session-123");
+var response = await client.GetResponseAsync(messages, options);
+
+// Full control with DI
+services.AddIndexThinkingAgents();
+services.AddIndexThinkingContext();
+
+var client = new ChatClientBuilder(innerClient)
+    .UseIndexThinking()  // Auto-resolves IContextTracker, IContextInjector
+    .Build();
 ```
 
 ### Tasks
-- [ ] Design `IThinkingService` facade
-- [ ] Implement session loading/saving
-- [ ] Integrate query enhancement (v0.8.5)
-- [ ] Integrate memory recall (v0.8.0)
-- [ ] Add streaming support
-- [ ] Add OpenTelemetry activity support
-- [ ] Create DI extension methods
+- [x] Integrate IContextTracker/IContextInjector into ThinkingChatClient
+- [x] Add context options to ThinkingChatClientOptions
+- [x] Update UseIndexThinking() to resolve context services from DI
+- [x] Add convenience methods: ChatAsync(), SendAsync(), WithSession()
+- [x] Add comprehensive unit tests
 
-### Test Requirements
-- [ ] End-to-end session tests
-- [ ] Streaming tests
-- [ ] Multi-user isolation tests
+### Configuration
+
+```csharp
+.UseIndexThinking(options =>
+{
+    options.EnableContextTracking = true;
+    options.EnableContextInjection = true;
+    options.MaxContextTurns = 5;
+})
+```
 
 ### Deliverables
-- `IndexThinking.SDK` with `IThinkingService`
-- Session-aware API
+- Enhanced `ThinkingChatClient` with context support
+- Convenience extension methods (ChatAsync, SendAsync, WithSession)
+- DI integration for context services
+
+### Deferred to Later Versions
+- Streaming with context support → v0.10.0+ (requires careful design)
+- OpenTelemetry integration → v0.11.0 (Observability phase)
 
 ---
 

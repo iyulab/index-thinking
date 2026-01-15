@@ -1,5 +1,6 @@
 using IndexThinking.Agents;
 using IndexThinking.Continuation;
+using IndexThinking.Context;
 using IndexThinking.Core;
 
 namespace IndexThinking.Client;
@@ -45,4 +46,38 @@ public class ThinkingChatClientOptions
     /// Defaults to generating a new GUID.
     /// </summary>
     public Func<string> SessionIdFactory { get; set; } = () => Guid.NewGuid().ToString("N");
+
+    // ========================================
+    // Context-Aware Chat Options (v0.9.0)
+    // ========================================
+
+    /// <summary>
+    /// Whether to enable automatic conversation context tracking.
+    /// When enabled, conversations are tracked and context is injected automatically.
+    /// Default: true.
+    /// </summary>
+    public bool EnableContextTracking { get; set; } = true;
+
+    /// <summary>
+    /// Whether to enable context injection into messages.
+    /// When enabled, previous conversation turns are prepended to requests.
+    /// Default: true.
+    /// </summary>
+    public bool EnableContextInjection { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of previous turns to inject as context.
+    /// Default: 5 turns.
+    /// </summary>
+    public int MaxContextTurns { get; set; } = 5;
+
+    /// <summary>
+    /// Context tracker options for session management.
+    /// </summary>
+    public ContextTrackerOptions ContextTrackerOptions { get; set; } = ContextTrackerOptions.Default;
+
+    /// <summary>
+    /// Context injector options for message injection.
+    /// </summary>
+    public ContextInjectorOptions ContextInjectorOptions { get; set; } = ContextInjectorOptions.Default;
 }

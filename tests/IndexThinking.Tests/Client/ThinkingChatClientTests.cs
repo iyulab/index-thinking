@@ -2,6 +2,7 @@ using FluentAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Client;
+using IndexThinking.Context;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
 using Moq;
@@ -375,5 +376,277 @@ public class ThinkingChatClientExtensionsTests
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void WithSession_CreatesOptionsWithSessionId()
+    {
+        // Act
+        var options = ThinkingChatClientExtensions.WithSession("test-session");
+
+        // Assert
+        options.Should().NotBeNull();
+        options.AdditionalProperties.Should().ContainKey("IndexThinking.SessionId");
+        options.AdditionalProperties!["IndexThinking.SessionId"].Should().Be("test-session");
+    }
+
+    [Fact]
+    public void WithSessionId_AddsToExistingOptions()
+    {
+        // Arrange
+        var existingOptions = new ChatOptions { ModelId = "gpt-4" };
+
+        // Act
+        var result = ThinkingChatClientExtensions.WithSessionId(existingOptions, "my-session");
+
+        // Assert
+        result.ModelId.Should().Be("gpt-4");
+        result.AdditionalProperties.Should().ContainKey("IndexThinking.SessionId");
+        result.AdditionalProperties!["IndexThinking.SessionId"].Should().Be("my-session");
+    }
+
+    [Fact]
+    public void WithSessionId_NullOptions_CreatesNew()
+    {
+        // Act
+        var result = ThinkingChatClientExtensions.WithSessionId(null, "my-session");
+
+        // Assert
+        result.Should().NotBeNull();
+        result.AdditionalProperties!["IndexThinking.SessionId"].Should().Be("my-session");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void WithSession_NullOrEmptySessionId_Throws(string? sessionId)
+    {
+        // Act & Assert
+        var action = () => ThinkingChatClientExtensions.WithSession(sessionId!);
+        action.Should().Throw<ArgumentException>();
+    }
+}
+
+public class ThinkingChatClientContextIntegrationTests
+{
+    private readonly Mock<IChatClient> _innerClientMock;
+    private readonly Mock<IThinkingTurnManager> _turnManagerMock;
+    private readonly Mock<IContextTracker> _contextTrackerMock;
+    private readonly Mock<IContextInjector> _contextInjectorMock;
+
+    public ThinkingChatClientContextIntegrationTests()
+    {
+        _innerClientMock = new Mock<IChatClient>();
+        _turnManagerMock = new Mock<IThinkingTurnManager>();
+        _contextTrackerMock = new Mock<IContextTracker>();
+        _contextInjectorMock = new Mock<IContextInjector>();
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_WithContext_InjectsHistory()
+    {
+        // Arrange
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Current message") };
+        var previousTurn = new ConversationTurn
+        {
+            UserMessage = new ChatMessage(ChatRole.User, "Previous"),
+            AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Response")])
+        };
+        var context = new ConversationContext
+        {
+            SessionId = "test-session",
+            RecentTurns = [previousTurn]
+        };
+
+        _contextTrackerMock
+            .Setup(x => x.GetContext("test-session"))
+            .Returns(context);
+
+        var enrichedMessages = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Previous"),
+            new(ChatRole.Assistant, "Response"),
+            new(ChatRole.User, "Current message")
+        };
+
+        _contextInjectorMock
+            .Setup(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), context))
+            .Returns(enrichedMessages);
+
+        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Reply")]);
+        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
+        IList<ChatMessage>? capturedMessages = null;
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .Callback<ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(
+                (ctx, _) => capturedMessages = ctx.Messages)
+            .ReturnsAsync(turnResult);
+
+        var options = new ThinkingChatClientOptions
+        {
+            EnableContextTracking = true,
+            EnableContextInjection = true
+        };
+
+        var client = new ThinkingChatClient(
+            _innerClientMock.Object,
+            _turnManagerMock.Object,
+            options,
+            _contextTrackerMock.Object,
+            _contextInjectorMock.Object);
+
+        var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
+
+        // Act
+        await client.GetResponseAsync(messages, chatOptions);
+
+        // Assert
+        capturedMessages.Should().HaveCount(3);
+        _contextInjectorMock.Verify(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), context), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_TracksConversation()
+    {
+        // Arrange
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
+        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
+
+        _contextTrackerMock
+            .Setup(x => x.GetContext(It.IsAny<string>()))
+            .Returns(ConversationContext.Empty("test-session"));
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .ReturnsAsync(turnResult);
+
+        var options = new ThinkingChatClientOptions
+        {
+            EnableContextTracking = true,
+            EnableContextInjection = true
+        };
+
+        var client = new ThinkingChatClient(
+            _innerClientMock.Object,
+            _turnManagerMock.Object,
+            options,
+            _contextTrackerMock.Object,
+            _contextInjectorMock.Object);
+
+        var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
+
+        // Act
+        await client.GetResponseAsync(messages, chatOptions);
+
+        // Assert
+        _contextTrackerMock.Verify(
+            x => x.Track("test-session", It.Is<ChatMessage>(m => m.Text == "Hello"), expectedResponse),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_DisabledContextTracking_DoesNotTrack()
+    {
+        // Arrange
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
+        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .ReturnsAsync(turnResult);
+
+        var options = new ThinkingChatClientOptions
+        {
+            EnableContextTracking = false,
+            EnableContextInjection = false
+        };
+
+        var client = new ThinkingChatClient(
+            _innerClientMock.Object,
+            _turnManagerMock.Object,
+            options,
+            _contextTrackerMock.Object,
+            _contextInjectorMock.Object);
+
+        // Act
+        await client.GetResponseAsync(messages);
+
+        // Assert
+        _contextTrackerMock.Verify(x => x.Track(It.IsAny<string>(), It.IsAny<ChatMessage>(), It.IsAny<ChatResponse>()), Times.Never);
+        _contextInjectorMock.Verify(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), It.IsAny<ConversationContext>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_WithoutContextServices_WorksNormally()
+    {
+        // Arrange
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
+        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .ReturnsAsync(turnResult);
+
+        // No context tracker or injector
+        var client = new ThinkingChatClient(
+            _innerClientMock.Object,
+            _turnManagerMock.Object);
+
+        // Act
+        var response = await client.GetResponseAsync(messages);
+
+        // Assert
+        response.Should().NotBeNull();
+    }
+}
+
+public class ThinkingChatClientOptionsContextTests
+{
+    [Fact]
+    public void DefaultOptions_HasContextOptionsEnabled()
+    {
+        // Arrange & Act
+        var options = new ThinkingChatClientOptions();
+
+        // Assert
+        options.EnableContextTracking.Should().BeTrue();
+        options.EnableContextInjection.Should().BeTrue();
+        options.MaxContextTurns.Should().Be(5);
+        options.ContextTrackerOptions.Should().NotBeNull();
+        options.ContextInjectorOptions.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ContextOptions_CanBeCustomized()
+    {
+        // Arrange & Act
+        var options = new ThinkingChatClientOptions
+        {
+            EnableContextTracking = false,
+            EnableContextInjection = false,
+            MaxContextTurns = 10,
+            ContextTrackerOptions = new ContextTrackerOptions { MaxTurns = 20 },
+            ContextInjectorOptions = new ContextInjectorOptions { MaxTurnsToInject = 3 }
+        };
+
+        // Assert
+        options.EnableContextTracking.Should().BeFalse();
+        options.EnableContextInjection.Should().BeFalse();
+        options.MaxContextTurns.Should().Be(10);
+        options.ContextTrackerOptions.MaxTurns.Should().Be(20);
+        options.ContextInjectorOptions.MaxTurnsToInject.Should().Be(3);
     }
 }
