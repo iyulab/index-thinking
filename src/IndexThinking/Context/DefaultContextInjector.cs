@@ -96,7 +96,7 @@ public sealed record ContextInjectorOptions
     /// Whether to enable context injection.
     /// Default: true.
     /// </summary>
-    public bool EnableInjection { get; init; } = true;
+    public bool EnableInjection { get; set; } = true;
 
     /// <summary>
     /// Maximum number of previous turns to inject.
@@ -107,7 +107,7 @@ public sealed record ContextInjectorOptions
     /// excessive token usage. Consider the LLM's context window
     /// when setting this value.
     /// </remarks>
-    public int MaxTurnsToInject { get; init; } = 5;
+    public int MaxTurnsToInject { get; set; } = 5;
 
     /// <summary>
     /// Default options.

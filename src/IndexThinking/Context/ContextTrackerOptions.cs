@@ -14,26 +14,26 @@ public sealed record ContextTrackerOptions
     /// A reasonable value depends on the typical conversation length
     /// and the LLM's context window size.
     /// </remarks>
-    public int MaxTurns { get; init; } = 10;
+    public int MaxTurns { get; set; } = 10;
 
     /// <summary>
     /// Time-to-live for session contexts.
     /// Sessions without activity for this duration are automatically cleared.
     /// Default: 1 hour.
     /// </summary>
-    public TimeSpan SessionTtl { get; init; } = TimeSpan.FromHours(1);
+    public TimeSpan SessionTtl { get; set; } = TimeSpan.FromHours(1);
 
     /// <summary>
     /// Whether to automatically start a cleanup timer for expired sessions.
     /// Default: true.
     /// </summary>
-    public bool EnableCleanupTimer { get; init; } = true;
+    public bool EnableCleanupTimer { get; set; } = true;
 
     /// <summary>
     /// Interval for the cleanup timer.
     /// Default: 5 minutes.
     /// </summary>
-    public TimeSpan CleanupInterval { get; init; } = TimeSpan.FromMinutes(5);
+    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Default options with reasonable defaults for most use cases.

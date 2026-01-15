@@ -175,20 +175,20 @@ public sealed record InMemoryStateStoreOptions
     /// Default time-to-live for cached entries.
     /// If null, entries never expire.
     /// </summary>
-    public TimeSpan? DefaultTtl { get; init; }
+    public TimeSpan? DefaultTtl { get; set; }
 
     /// <summary>
     /// Whether to use sliding expiration (reset TTL on access).
     /// Only applies when <see cref="DefaultTtl"/> is set.
     /// Default: false (absolute expiration).
     /// </summary>
-    public bool UseSlidingExpiration { get; init; }
+    public bool UseSlidingExpiration { get; set; }
 
     /// <summary>
     /// Interval for automatic cleanup of expired entries.
     /// If null, cleanup only happens lazily during access.
     /// </summary>
-    public TimeSpan? CleanupInterval { get; init; }
+    public TimeSpan? CleanupInterval { get; set; }
 
     /// <summary>
     /// Creates options with no expiration (entries persist indefinitely).
