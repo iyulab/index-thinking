@@ -1,5 +1,4 @@
 using System.ClientModel;
-using System.Text.Json;
 using DotNetEnv;
 using IndexThinking.Client;
 using IndexThinking.Extensions;
@@ -17,95 +16,81 @@ builder.Services.AddIndexThinkingContext();
 builder.Services.AddIndexThinkingInMemoryStorage();
 builder.Services.AddIndexThinkingMetrics();
 
-// Get provider from environment or configuration
-var provider = builder.Configuration["Provider"] ?? "gpustack";
+// Get provider from environment
+var provider = Environment.GetEnvironmentVariable("AI_PROVIDER")?.ToLowerInvariant() ?? "gpustack";
 
 // Register chat client based on provider
 RegisterChatClient(builder.Services, provider);
 
 var app = builder.Build();
 
-// Chat endpoint - non-streaming
-app.MapPost("/chat", async (ChatRequest request, IChatClient chatClient) =>
+// Chat endpoint
+app.MapPost("/api/chat", async (ChatRequest request, IChatClient chatClient) =>
 {
-    var messages = new List<ChatMessage>
+    var messages = new List<ChatMessage>();
+    
+    // Add conversation history
+    if (request.History is not null)
     {
-        new(ChatRole.User, request.Message)
-    };
-
-    if (!string.IsNullOrEmpty(request.SystemPrompt))
-    {
-        messages.Insert(0, new ChatMessage(ChatRole.System, request.SystemPrompt));
+        foreach (var msg in request.History)
+        {
+            var role = msg.Role.ToLowerInvariant() == "user" ? ChatRole.User : ChatRole.Assistant;
+            messages.Add(new ChatMessage(role, msg.Content));
+        }
     }
-
+    
+    // Add current message
+    messages.Add(new ChatMessage(ChatRole.User, request.Message));
+    
     var options = new ChatOptions();
     options.AdditionalProperties ??= [];
     options.AdditionalProperties["SessionId"] = request.SessionId ?? Guid.NewGuid().ToString("N")[..8];
-
+    
     var response = await chatClient.GetResponseAsync(messages, options);
-
+    
+    // Extract thinking and metrics if available
     var thinkingContent = response.GetThinkingContent();
     var metrics = response.GetTurnMetrics();
-
+    
     return Results.Ok(new ChatResponse
     {
         Text = response.Text ?? "",
-        ThinkingTokens = thinkingContent?.TokenCount ?? 0,
-        ThinkingSummary = thinkingContent?.IsSummarized == true ? thinkingContent.Text[..Math.Min(200, thinkingContent.Text.Length)] : null,
-        InputTokens = metrics?.InputTokens ?? 0,
-        OutputTokens = metrics?.OutputTokens ?? 0,
-        ContinuationCount = metrics?.ContinuationCount ?? 0
+        Thinking = thinkingContent is not null ? new ThinkingInfo
+        {
+            TokenCount = thinkingContent.TokenCount,
+            IsSummarized = thinkingContent.IsSummarized,
+            Preview = thinkingContent.Text.Length > 200 
+                ? thinkingContent.Text[..200] + "..." 
+                : thinkingContent.Text
+        } : null,
+        Metrics = metrics is not null ? new MetricsInfo
+        {
+            InputTokens = metrics.InputTokens,
+            ThinkingTokens = metrics.ThinkingTokens,
+            OutputTokens = metrics.OutputTokens,
+            ContinuationCount = metrics.ContinuationCount
+        } : null
     });
 });
 
-// Chat endpoint - streaming
-app.MapPost("/chat/stream", async (ChatRequest request, IChatClient chatClient, HttpContext context) =>
-{
-    var messages = new List<ChatMessage>
-    {
-        new(ChatRole.User, request.Message)
-    };
-
-    if (!string.IsNullOrEmpty(request.SystemPrompt))
-    {
-        messages.Insert(0, new ChatMessage(ChatRole.System, request.SystemPrompt));
-    }
-
-    var options = new ChatOptions();
-    options.AdditionalProperties ??= [];
-    options.AdditionalProperties["SessionId"] = request.SessionId ?? Guid.NewGuid().ToString("N")[..8];
-
-    context.Response.ContentType = "text/event-stream";
-    context.Response.Headers.CacheControl = "no-cache";
-    context.Response.Headers.Connection = "keep-alive";
-
-    await foreach (var update in chatClient.GetStreamingResponseAsync(messages, options))
-    {
-        if (!string.IsNullOrEmpty(update.Text))
-        {
-            var data = JsonSerializer.Serialize(new { text = update.Text });
-            await context.Response.WriteAsync($"data: {data}\n\n");
-            await context.Response.Body.FlushAsync();
-        }
-    }
-
-    await context.Response.WriteAsync("data: [DONE]\n\n");
-});
-
-// Health check
+// Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", provider }));
 
 Console.WriteLine("===========================================");
-Console.WriteLine("  IndexThinking Web API Sample");
+Console.WriteLine("  IndexThinking WebApi Sample");
 Console.WriteLine($"  Provider: {provider.ToUpperInvariant()}");
-Console.WriteLine($"  Endpoints: POST /chat, POST /chat/stream");
 Console.WriteLine("===========================================");
+Console.WriteLine();
+Console.WriteLine("Endpoints:");
+Console.WriteLine("  POST /api/chat - Send chat message");
+Console.WriteLine("  GET  /health   - Health check");
+Console.WriteLine();
 
 app.Run();
 
 static void RegisterChatClient(IServiceCollection services, string provider)
 {
-    switch (provider.ToLowerInvariant())
+    switch (provider)
     {
         case "gpustack":
             RegisterGpuStackClient(services);
@@ -159,18 +144,37 @@ static void RegisterOpenAIClient(IServiceCollection services)
 }
 
 // Request/Response models
-public record ChatRequest(
-    string Message,
-    string? SystemPrompt = null,
-    string? SessionId = null
-);
+public record ChatRequest
+{
+    public required string Message { get; init; }
+    public string? SessionId { get; init; }
+    public List<HistoryMessage>? History { get; init; }
+}
+
+public record HistoryMessage
+{
+    public required string Role { get; init; }
+    public required string Content { get; init; }
+}
 
 public record ChatResponse
 {
     public required string Text { get; init; }
-    public int ThinkingTokens { get; init; }
-    public string? ThinkingSummary { get; init; }
+    public ThinkingInfo? Thinking { get; init; }
+    public MetricsInfo? Metrics { get; init; }
+}
+
+public record ThinkingInfo
+{
+    public int TokenCount { get; init; }
+    public bool IsSummarized { get; init; }
+    public string? Preview { get; init; }
+}
+
+public record MetricsInfo
+{
     public int InputTokens { get; init; }
+    public int ThinkingTokens { get; init; }
     public int OutputTokens { get; init; }
     public int ContinuationCount { get; init; }
 }
