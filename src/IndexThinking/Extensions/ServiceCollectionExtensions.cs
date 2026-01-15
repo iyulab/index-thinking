@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using IndexThinking.Abstractions;
@@ -311,5 +312,136 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IContextInjector, DefaultContextInjector>();
 
         return services;
+    }
+
+    // ========================================
+    // Distributed Cache Storage (v0.10.0)
+    // ========================================
+
+    /// <summary>
+    /// Adds a distributed cache-based thinking state store.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Requires an <see cref="IDistributedCache"/> to be registered.
+    /// Common registrations include:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item><c>AddStackExchangeRedisCache()</c> - Redis backend</item>
+    ///   <item><c>AddDistributedSqlServerCache()</c> - SQL Server backend</item>
+    ///   <item><c>AddDistributedMemoryCache()</c> - In-memory (development only)</item>
+    /// </list>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingDistributedStorage(this IServiceCollection services)
+    {
+        return services.AddIndexThinkingDistributedStorage(new DistributedCacheStateStoreOptions());
+    }
+
+    /// <summary>
+    /// Adds a distributed cache-based thinking state store with specified options.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">Configuration options.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingDistributedStorage(
+        this IServiceCollection services,
+        DistributedCacheStateStoreOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+
+        services.TryAddSingleton(options);
+        services.TryAddSingleton<IThinkingStateStore>(sp =>
+        {
+            var cache = sp.GetRequiredService<IDistributedCache>();
+            var opts = sp.GetRequiredService<DistributedCacheStateStoreOptions>();
+            return new DistributedCacheThinkingStateStore(cache, opts);
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a distributed cache-based thinking state store with configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Options configuration action.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingDistributedStorage(
+        this IServiceCollection services,
+        Action<DistributedCacheStateStoreOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new DistributedCacheStateStoreOptions();
+        configure(options);
+
+        return services.AddIndexThinkingDistributedStorage(options);
+    }
+
+    // ========================================
+    // Health Checks (v0.10.0)
+    // ========================================
+
+    /// <summary>
+    /// Adds a health check for the thinking state store.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Registers <see cref="ThinkingStateStoreHealthCheck"/> as a scoped service.
+    /// Use with ASP.NET Core health checks:
+    /// </para>
+    /// <code>
+    /// services.AddIndexThinkingHealthChecks();
+    /// services.AddHealthChecks()
+    ///     .AddCheck&lt;ThinkingStateStoreHealthCheck&gt;("thinking-state-store");
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingHealthChecks(this IServiceCollection services)
+    {
+        return services.AddIndexThinkingHealthChecks(new ThinkingStateStoreHealthCheckOptions());
+    }
+
+    /// <summary>
+    /// Adds a health check for the thinking state store with specified options.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="options">Health check options.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingHealthChecks(
+        this IServiceCollection services,
+        ThinkingStateStoreHealthCheckOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+
+        services.TryAddSingleton(options);
+        services.TryAddScoped<ThinkingStateStoreHealthCheck>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a health check for the thinking state store with configuration.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Options configuration action.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingHealthChecks(
+        this IServiceCollection services,
+        Action<ThinkingStateStoreHealthCheckOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var options = new ThinkingStateStoreHealthCheckOptions();
+        configure(options);
+
+        return services.AddIndexThinkingHealthChecks(options);
     }
 }

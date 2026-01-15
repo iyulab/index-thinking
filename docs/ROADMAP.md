@@ -1351,22 +1351,53 @@ var client = new ChatClientBuilder(innerClient)
 
 ---
 
-## v0.10.0 - State Storage II (Distributed)
+## v0.10.0 - IDistributedCache Integration ✅
 
-**Goal**: Enable distributed deployment.
+**Goal**: Enable distributed deployment via .NET standard abstractions.
 
-### Tasks
-- [ ] Implement `RedisThinkingStateStore`
-- [ ] Implement `PostgresThinkingStateStore`
-- [ ] Add distributed locking
-- [ ] Add health checks
+### Critical Insight
+Original plan called for separate `RedisThinkingStateStore` and `PostgresThinkingStateStore`.
+Research revealed this violates .NET ecosystem conventions:
+- `IDistributedCache` already supports Redis, SQL Server, NCache, etc.
+- Separate implementations would duplicate existing infrastructure
+- "Distributed locking" was unnecessary - state is session-scoped and ephemeral
 
-### Test Requirements
-- [ ] Integration tests with containerized Redis/PostgreSQL
+**Decision**: Wrap `IDistributedCache` instead of creating parallel implementations.
+
+### Completed Tasks
+- [x] Implement `DistributedCacheThinkingStateStore` (wraps any IDistributedCache)
+- [x] Add `DistributedCacheStateStoreOptions` with expiration controls
+- [x] Add `ThinkingStateStoreHealthCheck` (IHealthCheck)
+- [x] Add DI extensions: `AddIndexThinkingDistributedStorage()`, `AddIndexThinkingHealthChecks()`
+
+### Usage Example
+```csharp
+// Use any IDistributedCache backend (Redis, SQL Server, etc.)
+services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379";
+});
+
+services.AddIndexThinkingDistributedStorage(options =>
+{
+    options.KeyPrefix = "thinking:";
+    options.AbsoluteExpiration = TimeSpan.FromHours(1);
+});
+
+// Health checks
+services.AddIndexThinkingHealthChecks();
+services.AddHealthChecks()
+    .AddCheck<ThinkingStateStoreHealthCheck>("thinking-store");
+```
 
 ### Deliverables
-- `IndexThinking.Storage.Redis`
-- `IndexThinking.Storage.PostgreSQL`
+- `DistributedCacheThinkingStateStore` - IDistributedCache wrapper
+- `ThinkingStateStoreHealthCheck` - IHealthCheck implementation
+- DI registration helpers
+
+### Deferred to Later Versions
+- PostgreSQL direct implementation → Only if IDistributedCache insufficient
+- Distributed locking → Not needed for session-scoped state
 
 ---
 

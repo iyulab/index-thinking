@@ -1,5 +1,8 @@
 using FluentAssertions;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Continuation;
@@ -395,6 +398,224 @@ public class ServiceCollectionExtensionsTests
 
         // Assert
         result.Should().BeSameAs(services);
+    }
+
+    #endregion
+
+    #region Distributed Cache Storage (v0.10.0)
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddDistributedMemoryCache();
+
+        // Act
+        services.AddIndexThinkingDistributedStorage();
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetService<IThinkingStateStore>();
+
+        store.Should().NotBeNull();
+        store.Should().BeOfType<DistributedCacheThinkingStateStore>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_WithOptions_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddDistributedMemoryCache();
+        var options = new DistributedCacheStateStoreOptions
+        {
+            KeyPrefix = "custom:",
+            AbsoluteExpiration = TimeSpan.FromHours(2)
+        };
+
+        // Act
+        services.AddIndexThinkingDistributedStorage(options);
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetService<IThinkingStateStore>();
+        var registeredOptions = provider.GetService<DistributedCacheStateStoreOptions>();
+
+        store.Should().NotBeNull();
+        registeredOptions.Should().NotBeNull();
+        registeredOptions!.KeyPrefix.Should().Be("custom:");
+        registeredOptions.AbsoluteExpiration.Should().Be(TimeSpan.FromHours(2));
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_WithConfigure_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddDistributedMemoryCache();
+
+        // Act
+        services.AddIndexThinkingDistributedStorage(options =>
+        {
+            options.KeyPrefix = "configured:";
+            options.SlidingExpiration = TimeSpan.FromMinutes(30);
+        });
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetService<IThinkingStateStore>();
+        var registeredOptions = provider.GetService<DistributedCacheStateStoreOptions>();
+
+        store.Should().NotBeNull();
+        registeredOptions.Should().NotBeNull();
+        registeredOptions!.KeyPrefix.Should().Be("configured:");
+        registeredOptions.SlidingExpiration.Should().Be(TimeSpan.FromMinutes(30));
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_IsSingleton()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddDistributedMemoryCache();
+        services.AddIndexThinkingDistributedStorage();
+
+        // Act
+        var provider = services.BuildServiceProvider();
+        var store1 = provider.GetService<IThinkingStateStore>();
+        var store2 = provider.GetService<IThinkingStateStore>();
+
+        // Assert
+        store1.Should().BeSameAs(store2);
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_NullServices_Throws()
+    {
+        // Act
+        var action = () => ((IServiceCollection)null!).AddIndexThinkingDistributedStorage();
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_NullOptions_Throws()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var action = () => services.AddIndexThinkingDistributedStorage((DistributedCacheStateStoreOptions)null!);
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingDistributedStorage_WithoutCache_ThrowsOnResolve()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddIndexThinkingDistributedStorage();
+
+        // Act
+        var provider = services.BuildServiceProvider();
+        var action = () => provider.GetRequiredService<IThinkingStateStore>();
+
+        // Assert - should throw because IDistributedCache is not registered
+        action.Should().Throw<InvalidOperationException>();
+    }
+
+    #endregion
+
+    #region Health Checks (v0.10.0)
+
+    [Fact]
+    public void AddIndexThinkingHealthChecks_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+
+        // Act
+        services.AddIndexThinkingHealthChecks();
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var healthCheck = scope.ServiceProvider.GetService<ThinkingStateStoreHealthCheck>();
+
+        healthCheck.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddIndexThinkingHealthChecks_WithOptions_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+        var options = new ThinkingStateStoreHealthCheckOptions
+        {
+            Timeout = TimeSpan.FromSeconds(10),
+            TestSessionId = "__custom__"
+        };
+
+        // Act
+        services.AddIndexThinkingHealthChecks(options);
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        var registeredOptions = provider.GetService<ThinkingStateStoreHealthCheckOptions>();
+
+        registeredOptions.Should().NotBeNull();
+        registeredOptions!.Timeout.Should().Be(TimeSpan.FromSeconds(10));
+        registeredOptions.TestSessionId.Should().Be("__custom__");
+    }
+
+    [Fact]
+    public void AddIndexThinkingHealthChecks_WithConfigure_RegistersServices()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+
+        // Act
+        services.AddIndexThinkingHealthChecks(options =>
+        {
+            options.Timeout = TimeSpan.FromSeconds(3);
+        });
+
+        // Assert
+        var provider = services.BuildServiceProvider();
+        var registeredOptions = provider.GetService<ThinkingStateStoreHealthCheckOptions>();
+
+        registeredOptions.Should().NotBeNull();
+        registeredOptions!.Timeout.Should().Be(TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public void AddIndexThinkingHealthChecks_NullServices_Throws()
+    {
+        // Act
+        var action = () => ((IServiceCollection)null!).AddIndexThinkingHealthChecks();
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void AddIndexThinkingHealthChecks_NullOptions_Throws()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+
+        // Act
+        var action = () => services.AddIndexThinkingHealthChecks((ThinkingStateStoreHealthCheckOptions)null!);
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
     }
 
     #endregion
