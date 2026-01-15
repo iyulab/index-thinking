@@ -19,9 +19,9 @@ LLM APIs are stateless. Every chat app reimplements the same infrastructure:
 ```
 LLM API expects:                    But users send:
 ──────────────────                  ─────────────────
-{                                   "아까 그거 다시 해줘"
-  "messages": [                     "이거 더 빠르게"
-    // YOU manage history           "그 파일 수정해줘"
+{                                   "Do that thing again"
+  "messages": [                     "Make it faster"
+    // YOU manage history           "Fix that file"
     // YOU handle summarization
     // YOU interpret context        → Ambiguous, contextual,
     // YOU detect truncation          requires session state
@@ -32,7 +32,7 @@ LLM API expects:                    But users send:
 
 **Every chat app developer writes:**
 - Session/history management (sliding window, summarization)
-- Context interpretation ("아까 그거" → actual meaning)
+- Context interpretation ("that thing from before" → actual meaning)
 - Truncation handling (continue logic, fragment merging)
 - Provider-specific parsing (5+ different reasoning formats)
 - Token budget tracking
@@ -49,12 +49,12 @@ These are **repetitive but hard to do well**. IndexThinking handles them for you
 var response = await thinking.ChatAsync(
     userId: "user-123",
     sessionId: "session-456",
-    message: "아까 그거 다시 해줘"
+    message: "Do that thing again"
 );
 
 // What IndexThinking does internally:
 // 1. Load session history
-// 2. Interpret "아까 그거" → "Python DataFrame 저장 작업"
+// 2. Interpret "that thing" → "save DataFrame to CSV"
 // 3. Build optimized prompt with context
 // 4. Send to LLM, handle truncation
 // 5. Parse reasoning, track tokens
@@ -138,7 +138,7 @@ var result = response.GetTurnResult();          // Full turn info
 | **Token Budgeting** | Manual counting per provider | Auto-tracked |
 | **State Continuity** | Custom session management | Built-in |
 | **JSON/Code Recovery** | Manual truncated content repair | Automatic |
-| **Context Interpretation** | Manual "아까 그거" resolution | Coming v0.8.5 |
+| **Context Interpretation** | Manual "that thing" resolution | Coming v0.8.5 |
 | **Follow-up Suggestions** | Manual question generation | Coming v0.8.5 |
 | **Session Management** | Manual history, summarization | Coming v0.9.0 |
 

@@ -1193,13 +1193,13 @@ src/IndexThinking/
 
 LLM APIs are stateless, but users speak in context:
 ```
-User sends:     "아까 그거 다시 해줘"
+User sends:     "Do that thing again"
 LLM needs:      "Python DataFrame을 CSV로 저장하는 작업을 다시 실행해주세요"
 ```
 
 IndexThinking bridges this gap by:
 1. Tracking conversation context (recent topics, entities)
-2. Resolving ambiguous references ("이거", "아까 그거", "더 빠르게")
+2. Resolving ambiguous references ("this", "that thing", "make it faster")
 3. Enriching queries with relevant memory (via v0.8.0 IMemoryProvider)
 
 ### Core Interfaces
@@ -1238,8 +1238,8 @@ public record ConversationContext
 - [ ] Implement `InMemoryContextTracker`
 - [ ] Define `IQueryEnricher` interface
 - [ ] Implement `DefaultQueryEnricher`
-  - Pronoun resolution ("이거" → actual entity)
-  - Action reference ("아까 그거" → last action)
+  - Pronoun resolution ("this" → actual entity)
+  - Action reference ("that thing" → last action)
   - Topic continuation detection
 - [ ] Define `IFollowUpGenerator` interface
 - [ ] Implement `DefaultFollowUpGenerator`
@@ -1261,8 +1261,8 @@ public record ConversationContext
 {
     options.EnableQueryEnrichment = true;     // Enable pre-processing
     options.ContextWindowSize = 5;            // Track last 5 turns
-    options.ResolvePronouns = true;           // "이거" → entity
-    options.ResolveActionReferences = true;   // "아까 그거" → action
+    options.ResolvePronouns = true;           // "this" → entity
+    options.ResolveActionReferences = true;   // "that thing" → action
 })
 ```
 
@@ -1283,12 +1283,12 @@ public record ConversationContext
 var response = await thinking.ChatAsync(
     userId: "user-123",
     sessionId: "session-456",
-    message: "아까 그거 다시 해줘"
+    message: "Do that thing again"
 );
 
 // IndexThinking handles everything:
 // - Session history loading
-// - Context interpretation ("아까 그거" → actual meaning)
+// - Context interpretation ("that thing" → actual meaning)
 // - Prompt optimization
 // - LLM request with truncation handling
 // - Response parsing and state saving
@@ -1626,8 +1626,8 @@ Scope: core, parsers, storage, agents, sdk, samples
 ```
 LLM API (stateless):              User sends (contextual):
 ─────────────────────             ─────────────────────────
-{ "messages": [...] }             "아까 그거 다시 해줘"
-                                  "이거 더 빠르게"
+{ "messages": [...] }             "Do that thing again"
+                                  "Make this faster"
                                   "그 파일 수정해줘"
 ```
 
