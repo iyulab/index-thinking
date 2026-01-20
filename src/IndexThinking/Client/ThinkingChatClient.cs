@@ -5,6 +5,7 @@ using IndexThinking.Agents;
 using IndexThinking.Context;
 using IndexThinking.Core;
 using IndexThinking.Diagnostics;
+using IndexThinking.Modifiers;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Client;
@@ -21,6 +22,7 @@ namespace IndexThinking.Client;
 ///   <item>Reasoning content extraction and parsing</item>
 ///   <item>Turn state management</item>
 ///   <item>Conversation context tracking and injection (v0.9.0)</item>
+///   <item>Explicit reasoning activation for providers that require it (v0.12.0)</item>
 /// </list>
 /// </remarks>
 public class ThinkingChatClient : DelegatingChatClient
@@ -30,6 +32,7 @@ public class ThinkingChatClient : DelegatingChatClient
     private readonly IContextTracker? _contextTracker;
     private readonly IContextInjector? _contextInjector;
     private readonly IndexThinkingMeter? _meter;
+    private readonly ReasoningRequestModifierRegistry? _modifierRegistry;
 
     /// <summary>
     /// Metadata key for storing <see cref="ThinkingContent"/> in the response.
@@ -55,13 +58,15 @@ public class ThinkingChatClient : DelegatingChatClient
     /// <param name="contextTracker">Optional context tracker for conversation management.</param>
     /// <param name="contextInjector">Optional context injector for message enrichment.</param>
     /// <param name="meter">Optional meter for IndexThinking-specific metrics.</param>
+    /// <param name="modifierRegistry">Optional registry for reasoning request modifiers.</param>
     public ThinkingChatClient(
         IChatClient innerClient,
         IThinkingTurnManager turnManager,
         ThinkingChatClientOptions? options = null,
         IContextTracker? contextTracker = null,
         IContextInjector? contextInjector = null,
-        IndexThinkingMeter? meter = null)
+        IndexThinkingMeter? meter = null,
+        ReasoningRequestModifierRegistry? modifierRegistry = null)
         : base(innerClient)
     {
         _turnManager = turnManager ?? throw new ArgumentNullException(nameof(turnManager));
@@ -69,6 +74,7 @@ public class ThinkingChatClient : DelegatingChatClient
         _contextTracker = contextTracker;
         _contextInjector = contextInjector;
         _meter = meter;
+        _modifierRegistry = modifierRegistry ?? (_options.EnableReasoning ? ReasoningRequestModifierRegistry.Default : null);
     }
 
     /// <inheritdoc />
@@ -82,16 +88,19 @@ public class ThinkingChatClient : DelegatingChatClient
         var messageList = messages as IList<ChatMessage> ?? messages.ToList();
         var sessionId = GetSessionId(options);
 
+        // Enable reasoning in request if configured
+        var modifiedOptions = EnableReasoningIfRequired(options);
+
         // Inject conversation context if enabled
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
         // Create thinking context from messages and options
-        var context = CreateContext(enrichedMessages, options, cancellationToken, sessionId);
+        var context = CreateContext(enrichedMessages, modifiedOptions, cancellationToken, sessionId);
 
         // Process through turn manager
         var turnResult = await _turnManager.ProcessTurnAsync(
             context,
-            async (msgs, ct) => await base.GetResponseAsync(msgs, options, ct));
+            async (msgs, ct) => await base.GetResponseAsync(msgs, modifiedOptions, ct));
 
         // Track conversation if enabled
         TrackConversation(sessionId, messageList, turnResult.Response);
@@ -122,7 +131,10 @@ public class ThinkingChatClient : DelegatingChatClient
         //
         // Future enhancement: implement streaming-aware continuation
 
-        await foreach (var update in base.GetStreamingResponseAsync(messages, options, cancellationToken))
+        // Enable reasoning in request if configured (applies to streaming too)
+        var modifiedOptions = EnableReasoningIfRequired(options);
+
+        await foreach (var update in base.GetStreamingResponseAsync(messages, modifiedOptions, cancellationToken))
         {
             yield return update;
         }
@@ -158,6 +170,60 @@ public class ThinkingChatClient : DelegatingChatClient
         }
 
         return context;
+    }
+
+    /// <summary>
+    /// Enables reasoning in the request if configured and required by the model.
+    /// </summary>
+    /// <param name="options">The original chat options.</param>
+    /// <returns>Modified options with reasoning enabled, or the original options if not required.</returns>
+    private ChatOptions? EnableReasoningIfRequired(ChatOptions? options)
+    {
+        // Skip if reasoning activation is not enabled
+        if (!_options.EnableReasoning)
+        {
+            return options;
+        }
+
+        // Get model ID from options
+        var modelId = options?.ModelId;
+
+        // If auto-detection is enabled, check if the model requires explicit activation
+        if (_options.AutoDetectReasoningRequirement)
+        {
+            var registry = _modifierRegistry ?? ReasoningRequestModifierRegistry.Default;
+            if (!registry.RequiresExplicitActivation(modelId))
+            {
+                return options;
+            }
+        }
+
+        // Find appropriate modifier and enable reasoning
+        var modifier = GetReasoningModifier(modelId);
+        if (modifier is null)
+        {
+            return options;
+        }
+
+        return modifier.EnableReasoning(options, modelId);
+    }
+
+    /// <summary>
+    /// Gets the appropriate reasoning request modifier for the model.
+    /// </summary>
+    /// <param name="modelId">The model identifier.</param>
+    /// <returns>The modifier if found; otherwise, null.</returns>
+    private IReasoningRequestModifier? GetReasoningModifier(string? modelId)
+    {
+        // Use custom settings if provided
+        if (_options.ReasoningRequestSettings is not null)
+        {
+            return new OpenSourceRequestModifier(_options.ReasoningRequestSettings);
+        }
+
+        // Use registry to find appropriate modifier
+        var registry = _modifierRegistry ?? ReasoningRequestModifierRegistry.Default;
+        return registry.GetByModel(modelId);
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using IndexThinking.Agents;
 using IndexThinking.Continuation;
 using IndexThinking.Context;
 using IndexThinking.Core;
+using IndexThinking.Modifiers;
 
 namespace IndexThinking.Client;
 
@@ -80,4 +81,47 @@ public class ThinkingChatClientOptions
     /// Context injector options for message injection.
     /// </summary>
     public ContextInjectorOptions ContextInjectorOptions { get; set; } = ContextInjectorOptions.Default;
+
+    // ========================================
+    // Reasoning Activation Options (v0.12.0)
+    // ========================================
+
+    /// <summary>
+    /// Whether to explicitly request reasoning content from providers that require it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Some LLM providers (DeepSeek, vLLM, GPUStack, Qwen) require explicit flags in the request
+    /// to enable reasoning output. When this option is enabled, IndexThinking automatically
+    /// adds the appropriate activation flags based on the detected provider/model.
+    /// </para>
+    /// <para>
+    /// Providers that automatically include reasoning (OpenAI o1/o3/o4, Anthropic Claude, Google Gemini)
+    /// are not affected by this setting.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// // Enable reasoning activation for DeepSeek/vLLM models
+    /// var options = new ThinkingChatClientOptions
+    /// {
+    ///     EnableReasoning = true
+    /// };
+    /// </code>
+    /// </example>
+    public bool EnableReasoning { get; set; } = false;
+
+    /// <summary>
+    /// Whether to automatically detect if a model requires explicit reasoning activation.
+    /// When enabled, reasoning is activated only for models that require it.
+    /// When disabled with EnableReasoning=true, reasoning flags are always added.
+    /// Default: true.
+    /// </summary>
+    public bool AutoDetectReasoningRequirement { get; set; } = true;
+
+    /// <summary>
+    /// Custom settings for open-source reasoning request modification.
+    /// Use this to override default field names or add model-specific settings.
+    /// </summary>
+    public OpenSourceReasoningRequestSettings? ReasoningRequestSettings { get; set; }
 }

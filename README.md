@@ -58,13 +58,28 @@ var response = await client.ChatAsync("session-123", "Do that again");
 
 ## Supported Providers
 
-| Provider | Reasoning Format | Truncation Handling |
-|----------|-----------------|---------------------|
-| **OpenAI** | `reasoning` field | `length`, `content_filter` |
-| **Anthropic** | `thinking` blocks | `max_tokens`, `refusal` |
-| **Google Gemini** | `thoughtSignature` | `MAX_TOKENS`, `SAFETY` |
-| **DeepSeek/Qwen** | `<think>` tags | OpenAI-compatible |
-| **vLLM/GPUStack** | Configurable tags | `length` |
+| Provider | Reasoning Format | Truncation Handling | Requires Activation |
+|----------|-----------------|---------------------|---------------------|
+| **OpenAI** | `reasoning` field | `length`, `content_filter` | No (automatic) |
+| **Anthropic** | `thinking` blocks | `max_tokens`, `refusal` | No (automatic) |
+| **Google Gemini** | `thoughtSignature` | `MAX_TOKENS`, `SAFETY` | No (automatic) |
+| **DeepSeek/Qwen** | `<think>` tags | OpenAI-compatible | Yes (`EnableReasoning`) |
+| **vLLM/GPUStack** | Configurable tags | `length` | Yes (`EnableReasoning`) |
+
+### Enabling Reasoning for DeepSeek/vLLM/Qwen
+
+Some providers require explicit reasoning activation:
+
+```csharp
+var options = new ThinkingChatClientOptions
+{
+    EnableReasoning = true  // Adds include_reasoning: true to requests
+};
+
+var client = new ChatClientBuilder(innerClient)
+    .UseIndexThinking(options)
+    .Build(serviceProvider);
+```
 
 ## Documentation
 

@@ -9,6 +9,7 @@ using IndexThinking.Continuation;
 using IndexThinking.Core;
 using IndexThinking.Diagnostics;
 using IndexThinking.Memory;
+using IndexThinking.Modifiers;
 using IndexThinking.Stores;
 using IndexThinking.Tokenization;
 
@@ -534,6 +535,103 @@ public static class ServiceCollectionExtensions
             var meterFactory = sp.GetService<IMeterFactory>();
             return new IndexThinkingMeter(meterFactory);
         });
+
+        return services;
+    }
+
+    // ========================================
+    // Reasoning Request Modifiers (v0.12.0)
+    // ========================================
+
+    /// <summary>
+    /// Adds the default reasoning request modifier registry.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Registers the default <see cref="ReasoningRequestModifierRegistry"/> which includes
+    /// support for DeepSeek, Qwen, vLLM, and GPUStack models.
+    /// </para>
+    /// <para>
+    /// This is automatically called when using <c>ThinkingChatClient</c> with
+    /// <c>EnableReasoning = true</c>, but can be called explicitly if you need
+    /// to customize the registry.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingReasoningModifiers(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton(ReasoningRequestModifierRegistry.Default);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a custom reasoning request modifier registry.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Configuration action for the registry.</param>
+    /// <returns>The service collection for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// Use this to customize which providers and models require explicit reasoning activation.
+    /// </para>
+    /// <code>
+    /// services.AddIndexThinkingReasoningModifiers(registry =>
+    /// {
+    ///     // Add a custom modifier
+    ///     registry.Register(new MyCustomModifier());
+    ///
+    ///     // Add a custom model prefix mapping
+    ///     registry.RegisterModelPrefix("my-model", "my-provider");
+    /// });
+    /// </code>
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingReasoningModifiers(
+        this IServiceCollection services,
+        Action<ReasoningRequestModifierRegistry> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        var registry = new ReasoningRequestModifierRegistry();
+
+        // Start with defaults from the Default registry
+        foreach (var provider in ReasoningRequestModifierRegistry.Default.RegisteredProviders)
+        {
+            var modifier = ReasoningRequestModifierRegistry.Default.GetByProvider(provider);
+            if (modifier is not null)
+            {
+                registry.Register(modifier);
+            }
+        }
+        foreach (var (prefix, provider) in ReasoningRequestModifierRegistry.Default.RegisteredPrefixes)
+        {
+            registry.RegisterModelPrefix(prefix, provider);
+        }
+
+        // Apply custom configuration
+        configure(registry);
+
+        services.AddSingleton(registry);
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds a custom reasoning request modifier.
+    /// </summary>
+    /// <typeparam name="TModifier">The modifier type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection for chaining.</returns>
+    public static IServiceCollection AddIndexThinkingReasoningModifier<TModifier>(this IServiceCollection services)
+        where TModifier : class, IReasoningRequestModifier
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IReasoningRequestModifier, TModifier>();
 
         return services;
     }
