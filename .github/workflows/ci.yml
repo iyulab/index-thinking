@@ -39,13 +39,23 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: |
+          dotnet restore src/IndexThinking/IndexThinking.csproj
+          dotnet restore src/IndexThinking.SDK/IndexThinking.SDK.csproj
+          dotnet restore tests/IndexThinking.Tests/IndexThinking.Tests.csproj
+          dotnet restore tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: |
+          dotnet build src/IndexThinking/IndexThinking.csproj --no-restore --configuration Release
+          dotnet build src/IndexThinking.SDK/IndexThinking.SDK.csproj --no-restore --configuration Release
+          dotnet build tests/IndexThinking.Tests/IndexThinking.Tests.csproj --no-restore --configuration Release
+          dotnet build tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        run: |
+          dotnet test tests/IndexThinking.Tests/IndexThinking.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
+          dotnet test tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -77,7 +87,9 @@ jobs:
           echo "Detected version: $VERSION"
 
       - name: Build Release
-        run: dotnet build --configuration Release
+        run: |
+          dotnet build src/IndexThinking/IndexThinking.csproj --configuration Release
+          dotnet build src/IndexThinking.SDK/IndexThinking.SDK.csproj --configuration Release
 
       - name: Pack NuGet packages
         run: |
