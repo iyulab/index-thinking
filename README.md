@@ -56,6 +56,25 @@ var metrics = response.GetTurnMetrics();
 var response = await client.ChatAsync("session-123", "Do that again");
 ```
 
+### Streaming with Thinking Orchestration
+
+Streaming uses a **Collect-and-Yield** pattern: chunks are yielded to the caller immediately while buffered internally. After the stream completes, the buffered response is processed through the full orchestration pipeline (reasoning parsing, budget tracking, context tracking).
+
+```csharp
+await foreach (var update in client.GetStreamingResponseAsync(messages))
+{
+    // Real-time chunks arrive here
+    Console.Write(update.Text);
+
+    // The final update contains orchestration metadata
+    if (update.AdditionalProperties?.ContainsKey(ThinkingChatClient.TurnResultKey) == true)
+    {
+        var result = update.AdditionalProperties[ThinkingChatClient.TurnResultKey] as TurnResult;
+        Console.WriteLine($"\nTokens: {result?.Metrics.TotalTokens}");
+    }
+}
+```
+
 ## Supported Providers
 
 | Provider | Reasoning Format | Truncation Handling | Requires Activation |

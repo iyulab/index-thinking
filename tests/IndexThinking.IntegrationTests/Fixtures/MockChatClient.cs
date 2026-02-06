@@ -95,13 +95,24 @@ public class MockChatClient : IChatClient
     {
         var response = await GetResponseAsync(messages, null, cancellationToken);
         var text = response.Messages.FirstOrDefault()?.Text ?? "";
+        var words = text.Split(' ');
 
-        foreach (var word in text.Split(' '))
+        for (var i = 0; i < words.Length; i++)
         {
-            yield return new ChatResponseUpdate
+            var isLast = i == words.Length - 1;
+            var update = new ChatResponseUpdate
             {
-                Contents = [new TextContent(word + " ")]
+                Contents = [new TextContent(words[i] + " ")]
             };
+
+            // Include FinishReason and Usage on the last chunk
+            if (isLast)
+            {
+                update.FinishReason = response.FinishReason;
+                update.Contents.Add(new UsageContent(response.Usage ?? new UsageDetails()));
+            }
+
+            yield return update;
         }
     }
 

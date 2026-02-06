@@ -365,6 +365,7 @@ FodyWeavers.xsd
 # Local
 local-docs/
 .serena/
+claudedocs/
 CLAUDE.md
 tmpclaude-*
 .env

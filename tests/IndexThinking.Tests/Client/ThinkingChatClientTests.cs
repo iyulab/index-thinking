@@ -244,7 +244,7 @@ public class ThinkingChatClientTests
     }
 
     [Fact]
-    public async Task GetStreamingResponseAsync_DelegatesToInnerClient()
+    public async Task GetStreamingResponseAsync_CollectsAndYieldsWithOrchestration()
     {
         // Arrange
         var messages = new List<ChatMessage> { new(ChatRole.User, "Test") };
@@ -261,6 +261,15 @@ public class ThinkingChatClientTests
                 It.IsAny<CancellationToken>()))
             .Returns(updates.ToAsyncEnumerable());
 
+        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hello World")]);
+        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .ReturnsAsync(turnResult);
+
         // Act
         var result = new List<ChatResponseUpdate>();
         await foreach (var update in _client.GetStreamingResponseAsync(messages))
@@ -268,10 +277,43 @@ public class ThinkingChatClientTests
             result.Add(update);
         }
 
-        // Assert
-        result.Should().HaveCount(2);
+        // Assert - should have original 2 chunks plus 1 metadata chunk
+        result.Should().HaveCount(3);
         result[0].Text.Should().Be("Hello ");
         result[1].Text.Should().Be("World");
+
+        // Last chunk should contain TurnResult metadata
+        result[2].AdditionalProperties.Should().ContainKey(ThinkingChatClient.TurnResultKey);
+
+        // TurnManager should have been called
+        _turnManagerMock.Verify(x => x.ProcessTurnAsync(
+            It.IsAny<ThinkingContext>(),
+            It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetStreamingResponseAsync_NullMessages_Throws()
+    {
+        // Arrange
+        var turnResult = TurnResult.Success(
+            new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
+            TurnMetrics.CreateBuilder().Build());
+
+        _turnManagerMock
+            .Setup(x => x.ProcessTurnAsync(
+                It.IsAny<ThinkingContext>(),
+                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
+            .ReturnsAsync(turnResult);
+
+        // Act
+        var action = async () =>
+        {
+            await foreach (var _ in _client.GetStreamingResponseAsync(null!)) { }
+        };
+
+        // Assert
+        await action.Should().ThrowAsync<ArgumentNullException>();
     }
 }
 

@@ -110,6 +110,8 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 | v0.12.0 | Samples & Demo | Console, Web API sample applications |
 | v0.13.0 | Production Hardening | E2E testing, documentation, performance tuning |
 | v0.14.0 | Provider Truncation | Provider-specific finish reason handling |
+| v0.15.0 | Reasoning Activation | Explicit reasoning activation for DeepSeek/vLLM/Qwen |
+| v0.16.0 | Streaming Orchestration | Collect-and-Yield streaming with full thinking pipeline |
 
 ---
 
@@ -1922,6 +1924,42 @@ LLM API (stateless):              User sends (contextual):
 - [x] Enhanced `TruncationDetector` with provider-specific handling
 - [x] Simulation tests for all 4 providers (OpenAI, Anthropic, Google, GPUStack)
 - [x] 674 unit tests + 37 simulation tests passing
+
+### v0.15.0 Reasoning Request Modifiers - COMPLETE ✅
+
+**Scope**: Explicit reasoning activation for providers that require it (DeepSeek, vLLM, GPUStack, Qwen)
+
+### v0.16.0 Streaming Orchestration - COMPLETE ✅
+
+**Scope**: Streaming responses with full thinking orchestration support
+
+**The Problem**:
+`GetStreamingResponseAsync` previously bypassed thinking orchestration entirely — no continuation detection, no budget tracking, no reasoning parsing.
+
+**Solution**: Collect-and-Yield pattern (following Microsoft.Extensions.AI's OpenTelemetryChatClient precedent):
+1. Stream chunks to caller immediately via `yield return`
+2. Buffer all `ChatResponseUpdate` chunks in `List<ChatResponseUpdate>`
+3. After stream completes, aggregate via `ToChatResponse()`
+4. Process aggregated response through full `IThinkingTurnManager.ProcessTurnAsync()` pipeline
+5. Yield final metadata update with `TurnResult`, `TurnMetrics`, `ThinkingContent`
+
+**Completed**:
+- [x] Collect-and-Yield streaming in `ThinkingChatClient.GetStreamingResponseAsync`
+- [x] Post-stream orchestration: reasoning parsing, budget tracking, metrics collection
+- [x] Context injection and conversation tracking for streaming
+- [x] Session ID support for streaming requests
+- [x] Telemetry tags and meter recording for streaming turns
+- [x] Final metadata update with `TurnResult` in `AdditionalProperties`
+- [x] Integration tests for streaming orchestration (6 tests)
+- [x] Updated unit tests for new streaming behavior
+- [x] README updated with streaming usage example
+- [x] 741 unit tests + 52 integration tests passing
+
+**Key Design Decisions**:
+- Follows the same pattern as Microsoft's `OpenTelemetryChatClient` and `CachingChatClient`
+- No breaking changes — existing streaming consumers continue to work
+- Metadata is appended as a final update, not mixed into content chunks
+- Continuation detection occurs post-stream (not per-chunk), matching current architecture
 
 ---
 

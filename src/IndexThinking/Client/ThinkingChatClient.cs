@@ -115,28 +115,87 @@ public class ThinkingChatClient : DelegatingChatClient
         return EnrichResponse(turnResult);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Streams responses while collecting updates for post-stream thinking orchestration.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Uses the "Collect-and-Yield" pattern: each streaming chunk is yielded to the caller
+    /// immediately while simultaneously buffered internally. After the stream completes,
+    /// the buffered updates are aggregated into a <see cref="ChatResponse"/> and processed
+    /// through the thinking orchestration pipeline (continuation, reasoning parsing, budget tracking).
+    /// </para>
+    /// <para>
+    /// The aggregated <see cref="TurnResult"/> is available via the last update's
+    /// <c>AdditionalProperties</c> using <see cref="TurnResultKey"/>.
+    /// </para>
+    /// </remarks>
     public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // For streaming, we need to handle this differently
-        // Option 1: Buffer and process (loses streaming benefits)
-        // Option 2: Pass through with post-processing (current approach)
-        //
-        // Currently, streaming bypasses thinking orchestration because:
-        // - Continuation detection requires complete response
-        // - Budget tracking needs token counts from complete response
-        //
-        // Future enhancement: implement streaming-aware continuation
+        ArgumentNullException.ThrowIfNull(messages);
+
+        var messageList = messages as IList<ChatMessage> ?? messages.ToList();
+        var sessionId = GetSessionId(options);
 
         // Enable reasoning in request if configured (applies to streaming too)
         var modifiedOptions = EnableReasoningIfRequired(options);
 
-        await foreach (var update in base.GetStreamingResponseAsync(messages, modifiedOptions, cancellationToken))
+        // Inject conversation context if enabled
+        var enrichedMessages = InjectConversationContext(sessionId, messageList);
+
+        // Collect-and-Yield: buffer updates while streaming to caller
+        var collectedUpdates = new List<ChatResponseUpdate>();
+
+        await foreach (var update in base.GetStreamingResponseAsync(enrichedMessages, modifiedOptions, cancellationToken)
+            .ConfigureAwait(false))
         {
+            collectedUpdates.Add(update);
             yield return update;
+        }
+
+        // Post-stream orchestration: aggregate and process through turn manager
+        if (collectedUpdates.Count > 0)
+        {
+            var aggregatedResponse = collectedUpdates.ToChatResponse();
+
+            var context = CreateContext(enrichedMessages, modifiedOptions, cancellationToken, sessionId);
+
+            var turnResult = await _turnManager.ProcessTurnAsync(
+                context,
+                (_, _) => Task.FromResult(aggregatedResponse));
+
+            // Track conversation if enabled
+            TrackConversation(sessionId, messageList, turnResult.Response);
+
+            // Add telemetry tags
+            AddTelemetryTags(turnResult);
+
+            // Record metrics
+            _meter?.RecordTurn(turnResult, sessionId);
+
+            // Yield a final metadata-only update with the TurnResult
+            var metadataUpdate = new ChatResponseUpdate
+            {
+                AdditionalProperties = new AdditionalPropertiesDictionary
+                {
+                    [TurnResultKey] = turnResult
+                }
+            };
+
+            if (_options.IncludeThinkingInMetadata && turnResult.ThinkingContent is not null)
+            {
+                metadataUpdate.AdditionalProperties[ThinkingContentKey] = turnResult.ThinkingContent;
+            }
+
+            if (_options.IncludeMetricsInMetadata)
+            {
+                metadataUpdate.AdditionalProperties[TurnMetricsKey] = turnResult.Metrics;
+            }
+
+            yield return metadataUpdate;
         }
     }
 

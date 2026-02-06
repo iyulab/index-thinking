@@ -36,8 +36,8 @@
     <PackageVersion Include="DotNetEnv" Version="3.1.1" />
 
     <!-- AI Providers for Simulation Tests -->
-    <PackageVersion Include="Anthropic" Version="12.1.0" />
-    <PackageVersion Include="GeminiDotnet.Extensions.AI" Version="0.14.1" />
+    <PackageVersion Include="Anthropic" Version="12.3.0" />
+    <PackageVersion Include="GeminiDotnet.Extensions.AI" Version="0.21.0" />
 
     <!-- Testing -->
     <PackageVersion Include="xunit" Version="2.9.3" />
