@@ -158,7 +158,7 @@ public class SimulationTestFixture : IDisposable
             ?? throw new InvalidOperationException("ANTHROPIC_API_KEY not set");
         var model = modelOverride ?? "claude-sonnet-4-20250514";
 
-        var anthropicClient = new AnthropicClient { APIKey = apiKey };
+        var anthropicClient = new AnthropicClient(new() { ApiKey = apiKey });
         var innerClient = anthropicClient.AsIChatClient(model);
 
         return new ChatClientBuilder(innerClient)
@@ -175,7 +175,7 @@ public class SimulationTestFixture : IDisposable
             ?? throw new InvalidOperationException("ANTHROPIC_API_KEY not set");
         var model = modelOverride ?? "claude-sonnet-4-20250514";
 
-        var anthropicClient = new AnthropicClient { APIKey = apiKey };
+        var anthropicClient = new AnthropicClient(new() { ApiKey = apiKey });
         return anthropicClient.AsIChatClient(model);
     }
 
