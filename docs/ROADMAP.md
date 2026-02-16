@@ -447,7 +447,7 @@ public class ThinkingStateStoreTests
 
 ### Acceptance Criteria
 
-- [ ] `dotnet build IndexThinking.sln` succeeds with no warnings
+- [ ] `dotnet build IndexThinking.slnx` succeeds with no warnings
 - [ ] `dotnet test` runs all tests successfully
 - [ ] Code coverage report shows >80% on new code
 - [ ] No TODO comments in committed code
@@ -1169,7 +1169,7 @@ src/IndexThinking/
 
 ### Acceptance Criteria
 
-- [ ] `dotnet build IndexThinking.sln` succeeds with no warnings
+- [ ] `dotnet build IndexThinking.slnx` succeeds with no warnings
 - [ ] `dotnet test` runs all tests successfully (450+ tests expected)
 - [ ] Code coverage >85% on new code
 - [ ] No TODO comments in committed code

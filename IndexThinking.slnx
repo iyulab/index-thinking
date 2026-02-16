@@ -1,0 +1,20 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/samples/">
+    <Project Path="samples/IndexThinking.Samples.Console/IndexThinking.Samples.Console.csproj" />
+    <Project Path="samples/IndexThinking.Samples.WebApi/IndexThinking.Samples.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/IndexThinking.SDK/IndexThinking.SDK.csproj" />
+    <Project Path="src/IndexThinking/IndexThinking.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj" />
+    <Project Path="tests/IndexThinking.SimulationTests/IndexThinking.SimulationTests.csproj" />
+    <Project Path="tests/IndexThinking.Tests/IndexThinking.Tests.csproj" />
+  </Folder>
+</Solution>
