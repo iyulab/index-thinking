@@ -115,7 +115,7 @@ public sealed class InMemoryContextTracker : IContextTracker, IDisposable
     /// </summary>
     public int SessionCount => _sessions.Count;
 
-    private SessionContext CreateNewSession(string sessionId, ConversationTurn turn)
+    private static SessionContext CreateNewSession(string sessionId, ConversationTurn turn)
     {
         return new SessionContext(sessionId, turn);
     }

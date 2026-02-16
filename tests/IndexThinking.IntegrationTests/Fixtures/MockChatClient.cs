@@ -128,7 +128,7 @@ public class MockChatClient : IChatClient
         return null;
     }
 
-    private ChatResponse CreateResponse(string content, ChatFinishReason finishReason)
+    private static ChatResponse CreateResponse(string content, ChatFinishReason finishReason)
     {
         var message = new ChatMessage(ChatRole.Assistant, content);
         return new ChatResponse([message])

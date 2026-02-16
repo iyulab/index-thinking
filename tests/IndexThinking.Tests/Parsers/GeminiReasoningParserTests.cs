@@ -148,7 +148,7 @@ public class GeminiReasoningParserTests
             new() { Text = "Result" }
         };
 
-        var result = _parser.TryParse(parts, out var content);
+        var result = GeminiReasoningParser.TryParse(parts, out var content);
 
         result.Should().BeTrue();
         content!.Text.Should().Be("Direct parsing test");
@@ -225,7 +225,7 @@ public class GeminiReasoningParserTests
             new() { Thought = "Thinking", ThoughtSignature = signature }
         };
 
-        var result = _parser.ExtractState(parts);
+        var result = GeminiReasoningParser.ExtractState(parts);
 
         result.Should().NotBeNull();
         var restored = GeminiReasoningParser.RestoreThoughtSignature(result!);
@@ -294,7 +294,7 @@ public class GeminiReasoningParserTests
     [Fact]
     public void HasThoughtSignature_NullResponse_ReturnsFalse()
     {
-        var result = _parser.HasThoughtSignature(null!);
+        var result = GeminiReasoningParser.HasThoughtSignature(null!);
 
         result.Should().BeFalse();
     }
@@ -309,7 +309,7 @@ public class GeminiReasoningParserTests
         );
         var response = CreateResponseWithRaw(geminiResponse);
 
-        var result = _parser.HasThoughtSignature(response);
+        var result = GeminiReasoningParser.HasThoughtSignature(response);
 
         result.Should().BeFalse();
     }
@@ -324,7 +324,7 @@ public class GeminiReasoningParserTests
         );
         var response = CreateResponseWithRaw(geminiResponse);
 
-        var result = _parser.HasThoughtSignature(response);
+        var result = GeminiReasoningParser.HasThoughtSignature(response);
 
         result.Should().BeTrue();
     }

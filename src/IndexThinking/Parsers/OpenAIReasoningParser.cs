@@ -100,7 +100,7 @@ public sealed class OpenAIReasoningParser : IReasoningParser
     /// <param name="reasoningItem">The reasoning item to parse.</param>
     /// <param name="content">The parsed thinking content, if successful.</param>
     /// <returns>True if content was parsed; otherwise, false.</returns>
-    public bool TryParse(OpenAIReasoningItem reasoningItem, out ThinkingContent? content)
+    public static bool TryParse(OpenAIReasoningItem reasoningItem, out ThinkingContent? content)
     {
         content = null;
 
@@ -130,7 +130,7 @@ public sealed class OpenAIReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="reasoningItem">The reasoning item to extract state from.</param>
     /// <returns>The reasoning state if encrypted content is present; otherwise, null.</returns>
-    public ReasoningState? ExtractState(OpenAIReasoningItem reasoningItem)
+    public static ReasoningState? ExtractState(OpenAIReasoningItem reasoningItem)
     {
         if (reasoningItem?.EncryptedContent is null)
         {

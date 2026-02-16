@@ -177,7 +177,7 @@ public class OpenAIReasoningParserTests
         };
 
         // Act
-        var result = _parser.TryParse(item, out var content);
+        var result = OpenAIReasoningParser.TryParse(item, out var content);
 
         // Assert
         result.Should().BeTrue();
@@ -195,7 +195,7 @@ public class OpenAIReasoningParserTests
         };
 
         // Act
-        var state = _parser.ExtractState(item);
+        var state = OpenAIReasoningParser.ExtractState(item);
 
         // Assert
         state.Should().NotBeNull();

@@ -126,7 +126,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         };
     }
 
-    private static IList<ChatMessage> BuildContinuationMessages(
+    private static List<ChatMessage> BuildContinuationMessages(
         ThinkingContext context,
         ChatResponse previousResponse,
         ContinuationConfig config)

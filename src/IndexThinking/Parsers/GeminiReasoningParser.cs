@@ -100,7 +100,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
     /// <param name="parts">The content parts to parse.</param>
     /// <param name="content">The parsed thinking content, if successful.</param>
     /// <returns>True if thinking content was found; otherwise, false.</returns>
-    public bool TryParse(IEnumerable<GeminiContentPart> parts, out ThinkingContent? content)
+    public static bool TryParse(IEnumerable<GeminiContentPart> parts, out ThinkingContent? content)
     {
         content = null;
 
@@ -127,7 +127,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="parts">The content parts to extract state from.</param>
     /// <returns>The reasoning state if thought signature is present; otherwise, null.</returns>
-    public ReasoningState? ExtractState(IEnumerable<GeminiContentPart> parts)
+    public static ReasoningState? ExtractState(IEnumerable<GeminiContentPart> parts)
     {
         var signature = ExtractThoughtSignature(parts.ToList());
 
@@ -170,7 +170,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="response">The response to check.</param>
     /// <returns>True if a thought signature is present; otherwise, false.</returns>
-    public bool HasThoughtSignature(ChatResponse response)
+    public static bool HasThoughtSignature(ChatResponse response)
     {
         if (response is null)
         {
@@ -293,7 +293,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
         }
     }
 
-    private static IReadOnlyList<GeminiContentPart> ParseCandidatesArray(JsonElement candidates)
+    private static List<GeminiContentPart> ParseCandidatesArray(JsonElement candidates)
     {
         var result = new List<GeminiContentPart>();
 
@@ -310,7 +310,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
         return result;
     }
 
-    private static IReadOnlyList<GeminiContentPart> ParsePartsArray(JsonElement parts)
+    private static List<GeminiContentPart> ParsePartsArray(JsonElement parts)
     {
         var result = new List<GeminiContentPart>();
 
@@ -333,7 +333,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
         return result;
     }
 
-    private static IReadOnlyList<GeminiContentPart> ParseOpenAICompatibleFormat(JsonElement choices)
+    private static List<GeminiContentPart> ParseOpenAICompatibleFormat(JsonElement choices)
     {
         var result = new List<GeminiContentPart>();
 
@@ -383,7 +383,7 @@ public sealed class GeminiReasoningParser : IReasoningParser
         return null;
     }
 
-    private static string CombineThoughtText(IReadOnlyList<GeminiContentPart> parts)
+    private static string CombineThoughtText(List<GeminiContentPart> parts)
     {
         if (parts.Count == 1)
         {

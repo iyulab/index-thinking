@@ -218,7 +218,7 @@ public sealed class TruncationDetector : ITruncationDetector
         return TruncationInfo.NotTruncated;
     }
 
-    private TruncationInfo CheckStructuralCompleteness(string text)
+    private static TruncationInfo CheckStructuralCompleteness(string text)
     {
         // Check for unbalanced braces/brackets
         var braceResult = CheckUnbalancedBraces(text);

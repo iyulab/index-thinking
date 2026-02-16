@@ -156,7 +156,7 @@ public class ThinkingPipelineTests : IClassFixture<SimulationTestFixture>
     {
         // Arrange
         using var indexThinkingClient = _fixture.CreateGpuStackClient();
-        using var rawClient = _fixture.CreateRawGpuStackClient();
+        using var rawClient = SimulationTestFixture.CreateRawGpuStackClient();
         var prompt = "What is 2 + 2?";
 
         // Act - Raw client
@@ -190,7 +190,7 @@ public class ThinkingPipelineTests : IClassFixture<SimulationTestFixture>
     {
         // Arrange
         using var indexThinkingClient = _fixture.CreateOpenAIClient();
-        using var rawClient = _fixture.CreateRawOpenAIClient();
+        using var rawClient = SimulationTestFixture.CreateRawOpenAIClient();
         var prompt = "What is 2 + 2?";
 
         // Act - Raw client
@@ -258,7 +258,7 @@ public class ThinkingPipelineTests : IClassFixture<SimulationTestFixture>
     {
         // Arrange
         using var indexThinkingClient = _fixture.CreateAnthropicClient();
-        using var rawClient = _fixture.CreateRawAnthropicClient();
+        using var rawClient = SimulationTestFixture.CreateRawAnthropicClient();
         var prompt = "What is 2 + 2?";
 
         // Act - Raw client
@@ -326,7 +326,7 @@ public class ThinkingPipelineTests : IClassFixture<SimulationTestFixture>
     {
         // Arrange
         using var indexThinkingClient = _fixture.CreateGoogleClient();
-        using var rawClient = _fixture.CreateRawGoogleClient();
+        using var rawClient = SimulationTestFixture.CreateRawGoogleClient();
         var prompt = "What is 2 + 2?";
 
         // Act - Raw client

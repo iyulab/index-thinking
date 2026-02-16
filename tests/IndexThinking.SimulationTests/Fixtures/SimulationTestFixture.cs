@@ -57,26 +57,26 @@ public class SimulationTestFixture : IDisposable
     /// <summary>
     /// Gets a value indicating whether GPUStack is configured.
     /// </summary>
-    public bool HasGpuStack =>
+    public static bool HasGpuStack =>
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_URL")) &&
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_APIKEY"));
 
     /// <summary>
     /// Gets a value indicating whether OpenAI is configured.
     /// </summary>
-    public bool HasOpenAI =>
+    public static bool HasOpenAI =>
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
 
     /// <summary>
     /// Gets a value indicating whether Anthropic is configured.
     /// </summary>
-    public bool HasAnthropic =>
+    public static bool HasAnthropic =>
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
 
     /// <summary>
     /// Gets a value indicating whether Google is configured.
     /// </summary>
-    public bool HasGoogle =>
+    public static bool HasGoogle =>
         !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GOOGLE_API_KEY"));
 
     /// <summary>
@@ -121,7 +121,7 @@ public class SimulationTestFixture : IDisposable
     /// Creates a raw IChatClient for GPUStack without IndexThinking pipeline.
     /// Useful for comparing behavior.
     /// </summary>
-    public IChatClient CreateRawGpuStackClient()
+    public static IChatClient CreateRawGpuStackClient()
     {
         var url = Environment.GetEnvironmentVariable("GPUSTACK_URL")
             ?? throw new InvalidOperationException("GPUSTACK_URL not set");
@@ -139,7 +139,7 @@ public class SimulationTestFixture : IDisposable
     /// <summary>
     /// Creates a raw IChatClient for OpenAI without IndexThinking pipeline.
     /// </summary>
-    public IChatClient CreateRawOpenAIClient(string? modelOverride = null)
+    public static IChatClient CreateRawOpenAIClient(string? modelOverride = null)
     {
         var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? throw new InvalidOperationException("OPENAI_API_KEY not set");
@@ -169,7 +169,7 @@ public class SimulationTestFixture : IDisposable
     /// <summary>
     /// Creates a raw IChatClient for Anthropic without IndexThinking pipeline.
     /// </summary>
-    public IChatClient CreateRawAnthropicClient(string? modelOverride = null)
+    public static IChatClient CreateRawAnthropicClient(string? modelOverride = null)
     {
         var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
             ?? throw new InvalidOperationException("ANTHROPIC_API_KEY not set");
@@ -203,7 +203,7 @@ public class SimulationTestFixture : IDisposable
     /// <summary>
     /// Creates a raw IChatClient for Google Gemini without IndexThinking pipeline.
     /// </summary>
-    public IChatClient CreateRawGoogleClient(string? modelOverride = null)
+    public static IChatClient CreateRawGoogleClient(string? modelOverride = null)
     {
         var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY")
             ?? throw new InvalidOperationException("GOOGLE_API_KEY not set");

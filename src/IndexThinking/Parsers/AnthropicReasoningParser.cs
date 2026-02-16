@@ -113,7 +113,7 @@ public sealed class AnthropicReasoningParser : IReasoningParser
     /// <param name="contentBlocks">The content blocks to parse.</param>
     /// <param name="content">The parsed thinking content, if successful.</param>
     /// <returns>True if thinking content was found; otherwise, false.</returns>
-    public bool TryParse(IEnumerable<AnthropicContentBlock> contentBlocks, out ThinkingContent? content)
+    public static bool TryParse(IEnumerable<AnthropicContentBlock> contentBlocks, out ThinkingContent? content)
     {
         content = null;
 
@@ -141,7 +141,7 @@ public sealed class AnthropicReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="contentBlocks">The content blocks to extract state from.</param>
     /// <returns>The reasoning state if thinking blocks are present; otherwise, null.</returns>
-    public ReasoningState? ExtractState(IEnumerable<AnthropicContentBlock> contentBlocks)
+    public static ReasoningState? ExtractState(IEnumerable<AnthropicContentBlock> contentBlocks)
     {
         var blocks = contentBlocks.ToList();
         var thinkingBlocks = blocks.OfType<AnthropicThinkingBlock>().ToList();
@@ -195,7 +195,7 @@ public sealed class AnthropicReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="response">The response to check.</param>
     /// <returns>True if redacted thinking is present; otherwise, false.</returns>
-    public bool HasRedactedThinking(ChatResponse response)
+    public static bool HasRedactedThinking(ChatResponse response)
     {
         if (response is null)
         {
@@ -288,7 +288,7 @@ public sealed class AnthropicReasoningParser : IReasoningParser
         }
     }
 
-    private static IReadOnlyList<AnthropicContentBlock> ParseContentArray(JsonElement array)
+    private static List<AnthropicContentBlock> ParseContentArray(JsonElement array)
     {
         var result = new List<AnthropicContentBlock>();
 
@@ -385,7 +385,7 @@ public sealed class AnthropicReasoningParser : IReasoningParser
         };
     }
 
-    private static string CombineThinkingText(IReadOnlyList<AnthropicThinkingBlock> blocks)
+    private static string CombineThinkingText(List<AnthropicThinkingBlock> blocks)
     {
         if (blocks.Count == 1)
         {

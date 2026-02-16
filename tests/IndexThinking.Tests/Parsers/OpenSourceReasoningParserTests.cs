@@ -330,7 +330,7 @@ public class OpenSourceReasoningParserTests
     [Fact]
     public void StripThinkTags_NullInput_ReturnsInput()
     {
-        var result = _parser.StripThinkTags(null!);
+        var result = OpenSourceReasoningParser.StripThinkTags(null!);
 
         result.Should().BeNull();
     }
@@ -340,7 +340,7 @@ public class OpenSourceReasoningParserTests
     {
         var input = "Just plain text without any tags";
 
-        var result = _parser.StripThinkTags(input);
+        var result = OpenSourceReasoningParser.StripThinkTags(input);
 
         result.Should().Be(input);
     }
@@ -350,7 +350,7 @@ public class OpenSourceReasoningParserTests
     {
         var input = "<think>Hidden thinking process</think>The visible answer";
 
-        var result = _parser.StripThinkTags(input);
+        var result = OpenSourceReasoningParser.StripThinkTags(input);
 
         result.Should().Be("The visible answer");
     }
@@ -360,7 +360,7 @@ public class OpenSourceReasoningParserTests
     {
         var input = "<think>First thought</think>Middle<think>Second thought</think>End";
 
-        var result = _parser.StripThinkTags(input);
+        var result = OpenSourceReasoningParser.StripThinkTags(input);
 
         result.Should().Be("MiddleEnd");
     }

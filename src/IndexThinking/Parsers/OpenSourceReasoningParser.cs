@@ -226,7 +226,7 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     /// </summary>
     /// <param name="text">The text potentially containing think tags.</param>
     /// <returns>The text with think tags and their content removed.</returns>
-    public string StripThinkTags(string text)
+    public static string StripThinkTags(string text)
     {
         if (string.IsNullOrEmpty(text))
         {

@@ -9,7 +9,7 @@ namespace IndexThinking.Tokenization;
 /// </summary>
 public sealed class TokenCounterChain : ITokenCounter
 {
-    private readonly IReadOnlyList<ITokenCounter> _counters;
+    private readonly List<ITokenCounter> _counters;
     private readonly string? _modelId;
 
     /// <summary>

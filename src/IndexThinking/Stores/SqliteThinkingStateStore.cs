@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 using IndexThinking.Abstractions;
 using IndexThinking.Core;
@@ -219,7 +220,7 @@ public sealed class SqliteThinkingStateStore : IThinkingStateStore, IDisposable
                 command.CommandText = $"SELECT COUNT(*) FROM {TableName}";
 
                 var result = command.ExecuteScalar();
-                return Convert.ToInt32(result);
+                return Convert.ToInt32(result, CultureInfo.InvariantCulture);
             }
             finally
             {
@@ -360,7 +361,7 @@ public sealed class SqliteThinkingStateStore : IThinkingStateStore, IDisposable
         if (rsProvider is not null)
         {
             var rsData = (byte[])reader["reasoning_state_data"];
-            var rsCapturedAt = DateTimeOffset.Parse(reader.GetString("reasoning_state_captured_at"));
+            var rsCapturedAt = DateTimeOffset.Parse(reader.GetString("reasoning_state_captured_at"), CultureInfo.InvariantCulture);
 
             reasoningState = new ReasoningState
             {
@@ -378,8 +379,8 @@ public sealed class SqliteThinkingStateStore : IThinkingStateStore, IDisposable
             TotalThinkingTokens = reader.GetInt32("total_thinking_tokens"),
             TotalOutputTokens = reader.GetInt32("total_output_tokens"),
             ContinuationCount = reader.GetInt32("continuation_count"),
-            CreatedAt = DateTimeOffset.Parse(reader.GetString("created_at")),
-            UpdatedAt = DateTimeOffset.Parse(reader.GetString("updated_at"))
+            CreatedAt = DateTimeOffset.Parse(reader.GetString("created_at"), CultureInfo.InvariantCulture),
+            UpdatedAt = DateTimeOffset.Parse(reader.GetString("updated_at"), CultureInfo.InvariantCulture)
         };
     }
 }

@@ -229,7 +229,7 @@ public class AnthropicReasoningParserTests
         var response = CreateResponseWithRaw(rawJson);
 
         // Act
-        var hasRedacted = _parser.HasRedactedThinking(response);
+        var hasRedacted = AnthropicReasoningParser.HasRedactedThinking(response);
 
         // Assert
         hasRedacted.Should().BeTrue();
@@ -246,7 +246,7 @@ public class AnthropicReasoningParserTests
         var response = CreateResponseWithRaw(rawJson);
 
         // Act
-        var hasRedacted = _parser.HasRedactedThinking(response);
+        var hasRedacted = AnthropicReasoningParser.HasRedactedThinking(response);
 
         // Assert
         hasRedacted.Should().BeFalse();
@@ -263,7 +263,7 @@ public class AnthropicReasoningParserTests
         };
 
         // Act
-        var result = _parser.TryParse(blocks, out var content);
+        var result = AnthropicReasoningParser.TryParse(blocks, out var content);
 
         // Assert
         result.Should().BeTrue();
@@ -280,7 +280,7 @@ public class AnthropicReasoningParserTests
         };
 
         // Act
-        var state = _parser.ExtractState(blocks);
+        var state = AnthropicReasoningParser.ExtractState(blocks);
 
         // Assert
         state.Should().NotBeNull();
