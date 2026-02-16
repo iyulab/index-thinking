@@ -2,28 +2,28 @@ using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Agents;
 
 public class HeuristicComplexityEstimatorTests
 {
-    private readonly Mock<ITokenCounter> _tokenCounterMock;
+    private readonly ITokenCounter _tokenCounter;
     private readonly HeuristicComplexityEstimator _estimator;
 
     public HeuristicComplexityEstimatorTests()
     {
-        _tokenCounterMock = new Mock<ITokenCounter>();
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100); // Default moderate length
-        _estimator = new HeuristicComplexityEstimator(_tokenCounterMock.Object);
+        _tokenCounter = Substitute.For<ITokenCounter>();
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100); // Default moderate length
+        _estimator = new HeuristicComplexityEstimator(_tokenCounter);
     }
 
     [Fact]
     public void Estimate_ShortFactualQuestion_ReturnsSimple()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(30); // Short message
+        _tokenCounter.Count(Arg.Any<string>()).Returns(30); // Short message
         var messages = CreateMessages("What is 2 + 2?");
 
         // Act
@@ -105,7 +105,7 @@ public class HeuristicComplexityEstimatorTests
     public void Estimate_LongMessage_IncreasesComplexity()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(600); // Long message
+        _tokenCounter.Count(Arg.Any<string>()).Returns(600); // Long message
         var messages = CreateMessages("Summarize this document...");
 
         // Act

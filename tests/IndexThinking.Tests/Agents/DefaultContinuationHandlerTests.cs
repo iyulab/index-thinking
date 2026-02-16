@@ -3,20 +3,20 @@ using IndexThinking.Agents;
 using IndexThinking.Continuation;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Agents;
 
 public class DefaultContinuationHandlerTests
 {
-    private readonly Mock<ITruncationDetector> _truncationDetectorMock;
+    private readonly ITruncationDetector _truncationDetector;
     private readonly DefaultContinuationHandler _handler;
 
     public DefaultContinuationHandlerTests()
     {
-        _truncationDetectorMock = new Mock<ITruncationDetector>();
-        _handler = new DefaultContinuationHandler(_truncationDetectorMock.Object);
+        _truncationDetector = Substitute.For<ITruncationDetector>();
+        _handler = new DefaultContinuationHandler(_truncationDetector);
     }
 
     [Fact]
@@ -25,8 +25,8 @@ public class DefaultContinuationHandlerTests
         // Arrange
         var context = CreateContext();
         var response = CreateResponse("Complete response");
-        _truncationDetectorMock
-            .Setup(x => x.Detect(response))
+        _truncationDetector
+            .Detect(response)
             .Returns(TruncationInfo.NotTruncated);
 
         // Act
@@ -46,15 +46,23 @@ public class DefaultContinuationHandlerTests
         var initialResponse = CreateResponse("First part...");
         var continuationResponse = CreateResponse("...second part.");
 
-        _truncationDetectorMock
-            .SetupSequence(x => x.Detect(It.IsAny<ChatResponse>()))
-            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit))
-            .Returns(TruncationInfo.NotTruncated);
+        var callCount = 0;
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
 
-        var sendMock = CreateSendRequestMock(continuationResponse);
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(continuationResponse));
 
         // Act
-        var result = await _handler.HandleAsync(context, initialResponse, sendMock.Object);
+        var result = await _handler.HandleAsync(context, initialResponse, sendRequest);
 
         // Assert
         Assert.Equal(1, result.ContinuationCount);
@@ -72,20 +80,28 @@ public class DefaultContinuationHandlerTests
         var second = CreateResponse("Part 2: This is the continuation with more content");
         var third = CreateResponse("Part 3: This is the final complete part");
 
-        _truncationDetectorMock
-            .SetupSequence(x => x.Detect(It.IsAny<ChatResponse>()))
-            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit))
-            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit))
-            .Returns(TruncationInfo.NotTruncated);
+        var detectCallCount = 0;
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                detectCallCount++;
+                return detectCallCount <= 2
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
 
-        var callCount = 0;
-        var sendMock = new Mock<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
-        sendMock
-            .Setup(x => x(It.IsAny<IList<ChatMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => callCount++ == 0 ? second : third);
+        var sendCallCount = 0;
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                sendCallCount++;
+                return Task.FromResult(sendCallCount == 1 ? second : third);
+            });
 
         // Act
-        var result = await _handler.HandleAsync(context, initial, sendMock.Object);
+        var result = await _handler.HandleAsync(context, initial, sendRequest);
 
         // Assert
         Assert.Equal(2, result.ContinuationCount);
@@ -100,14 +116,14 @@ public class DefaultContinuationHandlerTests
         var context = CreateContext(maxContinuations: 2);
         var response = CreateResponse("Partial");
 
-        _truncationDetectorMock
-            .Setup(x => x.Detect(It.IsAny<ChatResponse>()))
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
-        var sendMock = CreateSendRequestMock(CreateResponse("Still truncated"));
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("Still truncated"));
 
         // Act
-        var result = await _handler.HandleAsync(context, response, sendMock.Object);
+        var result = await _handler.HandleAsync(context, response, sendRequest);
 
         // Assert
         Assert.Equal(2, result.ContinuationCount);
@@ -121,15 +137,15 @@ public class DefaultContinuationHandlerTests
         var context = CreateContext(maxContinuations: 1, throwOnMax: true);
         var response = CreateResponse("Partial");
 
-        _truncationDetectorMock
-            .Setup(x => x.Detect(It.IsAny<ChatResponse>()))
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
-        var sendMock = CreateSendRequestMock(CreateResponse("Still truncated"));
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("Still truncated"));
 
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            _handler.HandleAsync(context, response, sendMock.Object));
+            _handler.HandleAsync(context, response, sendRequest));
     }
 
     [Fact]
@@ -141,15 +157,15 @@ public class DefaultContinuationHandlerTests
         var context = CreateContext().WithCancellation(cts.Token);
         var response = CreateResponse("Partial");
 
-        _truncationDetectorMock
-            .Setup(x => x.Detect(response))
+        _truncationDetector
+            .Detect(response)
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
-        var sendMock = CreateSendRequestMock(CreateResponse("Next"));
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("Next"));
 
         // Act & Assert
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            _handler.HandleAsync(context, response, sendMock.Object));
+            _handler.HandleAsync(context, response, sendRequest));
     }
 
     [Fact]
@@ -159,15 +175,15 @@ public class DefaultContinuationHandlerTests
         var context = CreateContext();
         var response = CreateResponse("Initial response");
 
-        _truncationDetectorMock
-            .Setup(x => x.Detect(It.IsAny<ChatResponse>()))
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
         // Return very short responses that don't make progress
-        var sendMock = CreateSendRequestMock(CreateResponse("X")); // Only 1 char, below MinProgressPerContinuation
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("X")); // Only 1 char, below MinProgressPerContinuation
 
         // Act
-        var result = await _handler.HandleAsync(context, response, sendMock.Object);
+        var result = await _handler.HandleAsync(context, response, sendRequest);
 
         // Assert - Should stop after first continuation due to no progress
         Assert.Equal(1, result.ContinuationCount);
@@ -255,12 +271,12 @@ public class DefaultContinuationHandlerTests
         return Task.FromResult(CreateResponse("Mock response"));
     }
 
-    private static Mock<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>> CreateSendRequestMock(
+    private static Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>> CreateSendRequestSubstitute(
         ChatResponse response)
     {
-        var mock = new Mock<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
-        mock.Setup(x => x(It.IsAny<IList<ChatMessage>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(response);
-        return mock;
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(response));
+        return sendRequest;
     }
 }

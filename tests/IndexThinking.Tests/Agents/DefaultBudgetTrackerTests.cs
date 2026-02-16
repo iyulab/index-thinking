@@ -2,21 +2,21 @@ using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Agents;
 
 public class DefaultBudgetTrackerTests
 {
-    private readonly Mock<ITokenCounter> _tokenCounterMock;
+    private readonly ITokenCounter _tokenCounter;
     private readonly DefaultBudgetTracker _tracker;
 
     public DefaultBudgetTrackerTests()
     {
-        _tokenCounterMock = new Mock<ITokenCounter>();
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100);
-        _tracker = new DefaultBudgetTracker(_tokenCounterMock.Object);
+        _tokenCounter = Substitute.For<ITokenCounter>();
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
+        _tracker = new DefaultBudgetTracker(_tokenCounter);
     }
 
     [Fact]
@@ -36,14 +36,14 @@ public class DefaultBudgetTrackerTests
 
         // Assert
         Assert.Equal(150, result.OutputTokens);
-        _tokenCounterMock.Verify(x => x.Count(It.IsAny<string>()), Times.Never);
+        _tokenCounter.DidNotReceive().Count(Arg.Any<string>());
     }
 
     [Fact]
     public void RecordResponse_WithoutUsage_EstimatesTokens()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count("Estimated response")).Returns(75);
+        _tokenCounter.Count("Estimated response").Returns(75);
         var response = CreateResponse("Estimated response");
 
         // Act
@@ -52,15 +52,15 @@ public class DefaultBudgetTrackerTests
 
         // Assert
         Assert.Equal(75, result.OutputTokens);
-        _tokenCounterMock.Verify(x => x.Count("Estimated response"), Times.Once);
+        _tokenCounter.Received(1).Count("Estimated response");
     }
 
     [Fact]
     public void RecordResponse_WithThinkingContent_AddsThinkingTokens()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count("Response text")).Returns(50);
-        _tokenCounterMock.Setup(x => x.Count("My thinking process")).Returns(200);
+        _tokenCounter.Count("Response text").Returns(50);
+        _tokenCounter.Count("My thinking process").Returns(200);
         var response = CreateResponse("Response text");
         var thinking = new ThinkingContent { Text = "My thinking process" };
 
@@ -77,7 +77,7 @@ public class DefaultBudgetTrackerTests
     public void GetUsage_AfterMultipleResponses_AccumulatesCorrectly()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
 
         // Act
         _tracker.SetInputTokens(50);
@@ -97,7 +97,7 @@ public class DefaultBudgetTrackerTests
     public void IsThinkingBudgetExceeded_UnderBudget_ReturnsFalse()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
         var thinking = new ThinkingContent { Text = "Some thinking" };
         _tracker.RecordResponse(CreateResponse("Response"), thinking);
         var config = new BudgetConfig { ThinkingBudget = 200 };
@@ -113,7 +113,7 @@ public class DefaultBudgetTrackerTests
     public void IsThinkingBudgetExceeded_OverBudget_ReturnsTrue()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(500);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(500);
         var thinking = new ThinkingContent { Text = "Long thinking process" };
         _tracker.RecordResponse(CreateResponse("Response"), thinking);
         var config = new BudgetConfig { ThinkingBudget = 100 };
@@ -129,7 +129,7 @@ public class DefaultBudgetTrackerTests
     public void IsAnswerBudgetExceeded_UnderBudget_ReturnsFalse()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
         _tracker.RecordResponse(CreateResponse("Short response"), null);
         var config = new BudgetConfig { AnswerBudget = 200 };
 
@@ -144,7 +144,7 @@ public class DefaultBudgetTrackerTests
     public void IsAnswerBudgetExceeded_OverBudget_ReturnsTrue()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(500);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(500);
         _tracker.RecordResponse(CreateResponse("Very long response"), null);
         var config = new BudgetConfig { AnswerBudget = 100 };
 
@@ -159,7 +159,7 @@ public class DefaultBudgetTrackerTests
     public void Reset_ClearsAllCounters()
     {
         // Arrange
-        _tokenCounterMock.Setup(x => x.Count(It.IsAny<string>())).Returns(100);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
         _tracker.SetInputTokens(50);
         _tracker.RecordResponse(CreateResponse("Response"), new ThinkingContent { Text = "Thinking" });
 

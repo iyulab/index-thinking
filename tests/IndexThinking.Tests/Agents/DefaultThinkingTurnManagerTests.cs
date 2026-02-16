@@ -2,50 +2,50 @@ using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Agents;
 
 public class DefaultThinkingTurnManagerTests
 {
-    private readonly Mock<IComplexityEstimator> _complexityEstimatorMock;
-    private readonly Mock<IContinuationHandler> _continuationHandlerMock;
-    private readonly Mock<IBudgetTracker> _budgetTrackerMock;
-    private readonly Mock<IReasoningParser> _parserMock;
-    private readonly Mock<ITokenCounter> _tokenCounterMock;
-    private readonly Mock<IThinkingStateStore> _stateStoreMock;
+    private readonly IComplexityEstimator _complexityEstimator;
+    private readonly IContinuationHandler _continuationHandler;
+    private readonly IBudgetTracker _budgetTracker;
+    private readonly IReasoningParser _parser;
+    private readonly ITokenCounter _tokenCounter;
+    private readonly IThinkingStateStore _stateStore;
     private readonly DefaultThinkingTurnManager _manager;
 
     public DefaultThinkingTurnManagerTests()
     {
-        _complexityEstimatorMock = new Mock<IComplexityEstimator>();
-        _continuationHandlerMock = new Mock<IContinuationHandler>();
-        _budgetTrackerMock = new Mock<IBudgetTracker>();
-        _parserMock = new Mock<IReasoningParser>();
-        _tokenCounterMock = new Mock<ITokenCounter>();
-        _stateStoreMock = new Mock<IThinkingStateStore>();
+        _complexityEstimator = Substitute.For<IComplexityEstimator>();
+        _continuationHandler = Substitute.For<IContinuationHandler>();
+        _budgetTracker = Substitute.For<IBudgetTracker>();
+        _parser = Substitute.For<IReasoningParser>();
+        _tokenCounter = Substitute.For<ITokenCounter>();
+        _stateStore = Substitute.For<IThinkingStateStore>();
 
         // Default setups
-        _complexityEstimatorMock
-            .Setup(x => x.Estimate(It.IsAny<IReadOnlyList<ChatMessage>>()))
+        _complexityEstimator
+            .Estimate(Arg.Any<IReadOnlyList<ChatMessage>>())
             .Returns(TaskComplexity.Moderate);
 
-        _tokenCounterMock
-            .Setup(x => x.Count(It.IsAny<ChatMessage>()))
+        _tokenCounter
+            .Count(Arg.Any<ChatMessage>())
             .Returns(50);
 
-        _budgetTrackerMock
-            .Setup(x => x.GetUsage())
+        _budgetTracker
+            .GetUsage()
             .Returns(new BudgetUsage { InputTokens = 50, OutputTokens = 100, ThinkingTokens = 200 });
 
         _manager = new DefaultThinkingTurnManager(
-            _complexityEstimatorMock.Object,
-            _continuationHandlerMock.Object,
-            _budgetTrackerMock.Object,
-            [_parserMock.Object],
-            _tokenCounterMock.Object,
-            _stateStoreMock.Object);
+            _complexityEstimator,
+            _continuationHandler,
+            _budgetTracker,
+            [_parser],
+            _tokenCounter,
+            _stateStore);
     }
 
     [Fact]
@@ -55,9 +55,9 @@ public class DefaultThinkingTurnManagerTests
         var context = CreateContext();
         var response = CreateResponse("Simple response");
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(ContinuationResult.NotTruncated(response));
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
 
         // Act
         var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
@@ -83,9 +83,9 @@ public class DefaultThinkingTurnManagerTests
             ReachedMaxContinuations = false
         };
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, initialResponse, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(continuationResult);
+        _continuationHandler
+            .HandleAsync(context, initialResponse, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(continuationResult));
 
         // Act
         var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(initialResponse));
@@ -104,13 +104,17 @@ public class DefaultThinkingTurnManagerTests
         var response = CreateResponse("Response with thinking");
         var thinking = new ThinkingContent { Text = "My reasoning process" };
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(ContinuationResult.NotTruncated(response));
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
 
-        _parserMock
-            .Setup(x => x.TryParse(response, out thinking))
-            .Returns(true);
+        _parser
+            .TryParse(response, out Arg.Any<ThinkingContent?>())
+            .Returns(callInfo =>
+            {
+                callInfo[1] = thinking;
+                return true;
+            });
 
         // Act
         var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
@@ -127,22 +131,22 @@ public class DefaultThinkingTurnManagerTests
         var context = CreateContext();
         var response = CreateResponse("Response");
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(ContinuationResult.NotTruncated(response));
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
 
-        _stateStoreMock
-            .Setup(x => x.GetAsync(context.SessionId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ThinkingState?)null);
+        _stateStore
+            .GetAsync(context.SessionId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult((ThinkingState?)null));
 
         // Act
         await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
 
         // Assert
-        _stateStoreMock.Verify(x => x.SetAsync(
+        await _stateStore.Received(1).SetAsync(
             context.SessionId,
-            It.IsAny<ThinkingState>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            Arg.Any<ThinkingState>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -152,12 +156,12 @@ public class DefaultThinkingTurnManagerTests
         var context = CreateContext();
         var response = CreateResponse("Response");
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(ContinuationResult.NotTruncated(response));
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
 
-        _budgetTrackerMock
-            .Setup(x => x.GetUsage())
+        _budgetTracker
+            .GetUsage()
             .Returns(new BudgetUsage { InputTokens = 50, OutputTokens = 150, ThinkingTokens = 300 });
 
         // Act
@@ -182,7 +186,7 @@ public class DefaultThinkingTurnManagerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(CreateResponse("Response"))));
 
-        _budgetTrackerMock.Verify(x => x.Reset(), Times.Once);
+        _budgetTracker.Received(1).Reset();
     }
 
     [Fact]
@@ -192,16 +196,16 @@ public class DefaultThinkingTurnManagerTests
         var context = CreateContext().WithComplexity(TaskComplexity.Research);
         var response = CreateResponse("Response");
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(ContinuationResult.NotTruncated(response));
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
 
         // Act
         var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
 
         // Assert
         Assert.Equal(TaskComplexity.Research, result.Metrics.DetectedComplexity);
-        _complexityEstimatorMock.Verify(x => x.Estimate(It.IsAny<IReadOnlyList<ChatMessage>>()), Times.Never);
+        _complexityEstimator.DidNotReceive().Estimate(Arg.Any<IReadOnlyList<ChatMessage>>());
     }
 
     [Fact]
@@ -218,9 +222,9 @@ public class DefaultThinkingTurnManagerTests
             ReachedMaxContinuations = true
         };
 
-        _continuationHandlerMock
-            .Setup(x => x.HandleAsync(context, response, It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(continuationResult);
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(continuationResult));
 
         // Act
         var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
@@ -235,10 +239,10 @@ public class DefaultThinkingTurnManagerTests
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new DefaultThinkingTurnManager(
             null!,
-            _continuationHandlerMock.Object,
-            _budgetTrackerMock.Object,
-            [_parserMock.Object],
-            _tokenCounterMock.Object));
+            _continuationHandler,
+            _budgetTracker,
+            [_parser],
+            _tokenCounter));
     }
 
     [Fact]
@@ -246,11 +250,11 @@ public class DefaultThinkingTurnManagerTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => new DefaultThinkingTurnManager(
-            _complexityEstimatorMock.Object,
+            _complexityEstimator,
             null!,
-            _budgetTrackerMock.Object,
-            [_parserMock.Object],
-            _tokenCounterMock.Object));
+            _budgetTracker,
+            [_parser],
+            _tokenCounter));
     }
 
     [Fact]

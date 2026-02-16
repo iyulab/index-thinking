@@ -2,7 +2,7 @@ using FluentAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Tokenization;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Tokenization;
@@ -34,33 +34,33 @@ public class TokenCounterChainTests
     public void Count_WithNoModel_UsesFirstCounter()
     {
         // Arrange
-        var mockCounter1 = new Mock<ITokenCounter>();
-        var mockCounter2 = new Mock<ITokenCounter>();
-        mockCounter1.Setup(c => c.Count("test")).Returns(5);
+        var mockCounter1 = Substitute.For<ITokenCounter>();
+        var mockCounter2 = Substitute.For<ITokenCounter>();
+        mockCounter1.Count("test").Returns(5);
 
-        var chain = new TokenCounterChain(new[] { mockCounter1.Object, mockCounter2.Object });
+        var chain = new TokenCounterChain(new[] { mockCounter1, mockCounter2 });
 
         // Act
         var count = chain.Count("test");
 
         // Assert
         count.Should().Be(5);
-        mockCounter1.Verify(c => c.Count("test"), Times.Once);
-        mockCounter2.Verify(c => c.Count(It.IsAny<string>()), Times.Never);
+        mockCounter1.Received(1).Count("test");
+        mockCounter2.DidNotReceive().Count(Arg.Any<string>());
     }
 
     [Fact]
     public void Count_WithSupportedModel_UsesFirstMatch()
     {
         // Arrange
-        var mockCounter1 = new Mock<ITokenCounter>();
-        var mockCounter2 = new Mock<ITokenCounter>();
-        mockCounter1.Setup(c => c.SupportsModel("gpt-4o")).Returns(true);
-        mockCounter1.Setup(c => c.Count("test")).Returns(10);
-        mockCounter2.Setup(c => c.SupportsModel("gpt-4o")).Returns(true);
-        mockCounter2.Setup(c => c.Count("test")).Returns(20);
+        var mockCounter1 = Substitute.For<ITokenCounter>();
+        var mockCounter2 = Substitute.For<ITokenCounter>();
+        mockCounter1.SupportsModel("gpt-4o").Returns(true);
+        mockCounter1.Count("test").Returns(10);
+        mockCounter2.SupportsModel("gpt-4o").Returns(true);
+        mockCounter2.Count("test").Returns(20);
 
-        var chain = new TokenCounterChain(new[] { mockCounter1.Object, mockCounter2.Object })
+        var chain = new TokenCounterChain(new[] { mockCounter1, mockCounter2 })
             .WithModel("gpt-4o");
 
         // Act
@@ -74,13 +74,13 @@ public class TokenCounterChainTests
     public void Count_WithUnsupportedModel_UsesFallback()
     {
         // Arrange
-        var mockCounter1 = new Mock<ITokenCounter>();
-        var mockCounter2 = new Mock<ITokenCounter>();
-        mockCounter1.Setup(c => c.SupportsModel("claude-3")).Returns(false);
-        mockCounter2.Setup(c => c.SupportsModel("claude-3")).Returns(true); // Fallback
-        mockCounter2.Setup(c => c.Count("test")).Returns(15);
+        var mockCounter1 = Substitute.For<ITokenCounter>();
+        var mockCounter2 = Substitute.For<ITokenCounter>();
+        mockCounter1.SupportsModel("claude-3").Returns(false);
+        mockCounter2.SupportsModel("claude-3").Returns(true); // Fallback
+        mockCounter2.Count("test").Returns(15);
 
-        var chain = new TokenCounterChain(new[] { mockCounter1.Object, mockCounter2.Object })
+        var chain = new TokenCounterChain(new[] { mockCounter1, mockCounter2 })
             .WithModel("claude-3");
 
         // Act
@@ -94,10 +94,10 @@ public class TokenCounterChainTests
     public void Count_NoCounterSupports_ThrowsInvalidOperationException()
     {
         // Arrange
-        var mockCounter = new Mock<ITokenCounter>();
-        mockCounter.Setup(c => c.SupportsModel(It.IsAny<string>())).Returns(false);
+        var mockCounter = Substitute.For<ITokenCounter>();
+        mockCounter.SupportsModel(Arg.Any<string>()).Returns(false);
 
-        var chain = new TokenCounterChain(new[] { mockCounter.Object })
+        var chain = new TokenCounterChain(new[] { mockCounter })
             .WithModel("unsupported-model");
 
         // Act
@@ -139,12 +139,12 @@ public class TokenCounterChainTests
     public void SupportsModel_AnyCounterSupports_ReturnsTrue()
     {
         // Arrange
-        var mockCounter1 = new Mock<ITokenCounter>();
-        var mockCounter2 = new Mock<ITokenCounter>();
-        mockCounter1.Setup(c => c.SupportsModel("test")).Returns(false);
-        mockCounter2.Setup(c => c.SupportsModel("test")).Returns(true);
+        var mockCounter1 = Substitute.For<ITokenCounter>();
+        var mockCounter2 = Substitute.For<ITokenCounter>();
+        mockCounter1.SupportsModel("test").Returns(false);
+        mockCounter2.SupportsModel("test").Returns(true);
 
-        var chain = new TokenCounterChain(new[] { mockCounter1.Object, mockCounter2.Object });
+        var chain = new TokenCounterChain(new[] { mockCounter1, mockCounter2 });
 
         // Act
         var result = chain.SupportsModel("test");
@@ -157,10 +157,10 @@ public class TokenCounterChainTests
     public void SupportsModel_NoCounterSupports_ReturnsFalse()
     {
         // Arrange
-        var mockCounter = new Mock<ITokenCounter>();
-        mockCounter.Setup(c => c.SupportsModel(It.IsAny<string>())).Returns(false);
+        var mockCounter = Substitute.For<ITokenCounter>();
+        mockCounter.SupportsModel(Arg.Any<string>()).Returns(false);
 
-        var chain = new TokenCounterChain(new[] { mockCounter.Object });
+        var chain = new TokenCounterChain(new[] { mockCounter });
 
         // Act
         var result = chain.SupportsModel("unsupported");
@@ -187,12 +187,12 @@ public class TokenCounterChainTests
     public void Count_ChatMessage_DelegatesToCounter()
     {
         // Arrange
-        var mockCounter = new Mock<ITokenCounter>();
+        var mockCounter = Substitute.For<ITokenCounter>();
         var message = new ChatMessage(ChatRole.User, "Hello");
-        mockCounter.Setup(c => c.SupportsModel(It.IsAny<string>())).Returns(true);
-        mockCounter.Setup(c => c.Count(message)).Returns(10);
+        mockCounter.SupportsModel(Arg.Any<string>()).Returns(true);
+        mockCounter.Count(message).Returns(10);
 
-        var chain = new TokenCounterChain(new[] { mockCounter.Object })
+        var chain = new TokenCounterChain(new[] { mockCounter })
             .WithModel("test");
 
         // Act

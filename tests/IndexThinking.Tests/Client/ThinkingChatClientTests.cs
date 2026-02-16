@@ -5,24 +5,24 @@ using IndexThinking.Client;
 using IndexThinking.Context;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Client;
 
 public class ThinkingChatClientTests
 {
-    private readonly Mock<IChatClient> _innerClientMock;
-    private readonly Mock<IThinkingTurnManager> _turnManagerMock;
+    private readonly IChatClient _innerClient;
+    private readonly IThinkingTurnManager _turnManager;
     private readonly ThinkingChatClient _client;
 
     public ThinkingChatClientTests()
     {
-        _innerClientMock = new Mock<IChatClient>();
-        _turnManagerMock = new Mock<IThinkingTurnManager>();
+        _innerClient = Substitute.For<IChatClient>();
+        _turnManager = Substitute.For<IThinkingTurnManager>();
         _client = new ThinkingChatClient(
-            _innerClientMock.Object,
-            _turnManagerMock.Object);
+            _innerClient,
+            _turnManager);
     }
 
     [Fact]
@@ -36,21 +36,20 @@ public class ThinkingChatClientTests
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var response = await _client.GetResponseAsync(messages);
 
         // Assert
         response.Should().NotBeNull();
-        _turnManagerMock.Verify(x => x.ProcessTurnAsync(
-            It.IsAny<ThinkingContext>(),
-            It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()),
-            Times.Once);
+        await _turnManager.Received(1).ProcessTurnAsync(
+            Arg.Any<ThinkingContext>(),
+            Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>());
     }
 
     [Fact]
@@ -62,11 +61,11 @@ public class ThinkingChatClientTests
         var thinkingContent = new ThinkingContent { Text = "My reasoning" };
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build(), thinkingContent);
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var response = await _client.GetResponseAsync(messages);
@@ -90,11 +89,11 @@ public class ThinkingChatClientTests
             .Build();
         var turnResult = TurnResult.Success(expectedResponse, metrics);
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var response = await _client.GetResponseAsync(messages);
@@ -115,11 +114,11 @@ public class ThinkingChatClientTests
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Response")]);
         var turnResult = TurnResult.Truncated(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var response = await _client.GetResponseAsync(messages);
@@ -139,13 +138,15 @@ public class ThinkingChatClientTests
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
         ThinkingContext? capturedContext = null;
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .Callback<ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(
-                (ctx, _) => capturedContext = ctx)
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(callInfo =>
+            {
+                capturedContext = callInfo.ArgAt<ThinkingContext>(0);
+                return Task.FromResult(turnResult);
+            });
 
         // Act
         await _client.GetResponseAsync(messages);
@@ -171,13 +172,15 @@ public class ThinkingChatClientTests
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
         ThinkingContext? capturedContext = null;
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .Callback<ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(
-                (ctx, _) => capturedContext = ctx)
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(callInfo =>
+            {
+                capturedContext = callInfo.ArgAt<ThinkingContext>(0);
+                return Task.FromResult(turnResult);
+            });
 
         // Act
         await _client.GetResponseAsync(messages, options);
@@ -197,13 +200,15 @@ public class ThinkingChatClientTests
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
         ThinkingContext? capturedContext = null;
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .Callback<ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(
-                (ctx, _) => capturedContext = ctx)
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(callInfo =>
+            {
+                capturedContext = callInfo.ArgAt<ThinkingContext>(0);
+                return Task.FromResult(turnResult);
+            });
 
         // Act
         await _client.GetResponseAsync(messages, options);
@@ -227,7 +232,7 @@ public class ThinkingChatClientTests
     public void Constructor_NullInnerClient_Throws()
     {
         // Act
-        var action = () => new ThinkingChatClient(null!, _turnManagerMock.Object);
+        var action = () => new ThinkingChatClient(null!, _turnManager);
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
@@ -237,7 +242,7 @@ public class ThinkingChatClientTests
     public void Constructor_NullTurnManager_Throws()
     {
         // Act
-        var action = () => new ThinkingChatClient(_innerClientMock.Object, null!);
+        var action = () => new ThinkingChatClient(_innerClient, null!);
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
@@ -254,21 +259,21 @@ public class ThinkingChatClientTests
             new() { Contents = [new TextContent("World")] }
         };
 
-        _innerClientMock
-            .Setup(x => x.GetStreamingResponseAsync(
-                It.IsAny<IEnumerable<ChatMessage>>(),
-                It.IsAny<ChatOptions?>(),
-                It.IsAny<CancellationToken>()))
+        _innerClient
+            .GetStreamingResponseAsync(
+                Arg.Any<IEnumerable<ChatMessage>>(),
+                Arg.Any<ChatOptions?>(),
+                Arg.Any<CancellationToken>())
             .Returns(updates.ToAsyncEnumerable());
 
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hello World")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var result = new List<ChatResponseUpdate>();
@@ -286,10 +291,9 @@ public class ThinkingChatClientTests
         result[2].AdditionalProperties.Should().ContainKey(ThinkingChatClient.TurnResultKey);
 
         // TurnManager should have been called
-        _turnManagerMock.Verify(x => x.ProcessTurnAsync(
-            It.IsAny<ThinkingContext>(),
-            It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()),
-            Times.Once);
+        await _turnManager.Received(1).ProcessTurnAsync(
+            Arg.Any<ThinkingContext>(),
+            Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>());
     }
 
     [Fact]
@@ -300,11 +304,11 @@ public class ThinkingChatClientTests
             new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
             TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // Act
         var action = async () =>
@@ -472,17 +476,17 @@ public class ThinkingChatClientExtensionsTests
 
 public class ThinkingChatClientContextIntegrationTests
 {
-    private readonly Mock<IChatClient> _innerClientMock;
-    private readonly Mock<IThinkingTurnManager> _turnManagerMock;
-    private readonly Mock<IContextTracker> _contextTrackerMock;
-    private readonly Mock<IContextInjector> _contextInjectorMock;
+    private readonly IChatClient _innerClient;
+    private readonly IThinkingTurnManager _turnManager;
+    private readonly IContextTracker _contextTracker;
+    private readonly IContextInjector _contextInjector;
 
     public ThinkingChatClientContextIntegrationTests()
     {
-        _innerClientMock = new Mock<IChatClient>();
-        _turnManagerMock = new Mock<IThinkingTurnManager>();
-        _contextTrackerMock = new Mock<IContextTracker>();
-        _contextInjectorMock = new Mock<IContextInjector>();
+        _innerClient = Substitute.For<IChatClient>();
+        _turnManager = Substitute.For<IThinkingTurnManager>();
+        _contextTracker = Substitute.For<IContextTracker>();
+        _contextInjector = Substitute.For<IContextInjector>();
     }
 
     [Fact]
@@ -501,8 +505,8 @@ public class ThinkingChatClientContextIntegrationTests
             RecentTurns = [previousTurn]
         };
 
-        _contextTrackerMock
-            .Setup(x => x.GetContext("test-session"))
+        _contextTracker
+            .GetContext("test-session")
             .Returns(context);
 
         var enrichedMessages = new List<ChatMessage>
@@ -512,21 +516,23 @@ public class ThinkingChatClientContextIntegrationTests
             new(ChatRole.User, "Current message")
         };
 
-        _contextInjectorMock
-            .Setup(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), context))
+        _contextInjector
+            .InjectContext(Arg.Any<IList<ChatMessage>>(), context)
             .Returns(enrichedMessages);
 
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Reply")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
         IList<ChatMessage>? capturedMessages = null;
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .Callback<ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(
-                (ctx, _) => capturedMessages = ctx.Messages)
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(callInfo =>
+            {
+                capturedMessages = callInfo.ArgAt<ThinkingContext>(0).Messages;
+                return Task.FromResult(turnResult);
+            });
 
         var options = new ThinkingChatClientOptions
         {
@@ -535,11 +541,11 @@ public class ThinkingChatClientContextIntegrationTests
         };
 
         var client = new ThinkingChatClient(
-            _innerClientMock.Object,
-            _turnManagerMock.Object,
+            _innerClient,
+            _turnManager,
             options,
-            _contextTrackerMock.Object,
-            _contextInjectorMock.Object);
+            _contextTracker,
+            _contextInjector);
 
         var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
 
@@ -548,7 +554,7 @@ public class ThinkingChatClientContextIntegrationTests
 
         // Assert
         capturedMessages.Should().HaveCount(3);
-        _contextInjectorMock.Verify(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), context), Times.Once);
+        _contextInjector.Received(1).InjectContext(Arg.Any<IList<ChatMessage>>(), context);
     }
 
     [Fact]
@@ -559,15 +565,15 @@ public class ThinkingChatClientContextIntegrationTests
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _contextTrackerMock
-            .Setup(x => x.GetContext(It.IsAny<string>()))
+        _contextTracker
+            .GetContext(Arg.Any<string>())
             .Returns(ConversationContext.Empty("test-session"));
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         var options = new ThinkingChatClientOptions
         {
@@ -576,11 +582,11 @@ public class ThinkingChatClientContextIntegrationTests
         };
 
         var client = new ThinkingChatClient(
-            _innerClientMock.Object,
-            _turnManagerMock.Object,
+            _innerClient,
+            _turnManager,
             options,
-            _contextTrackerMock.Object,
-            _contextInjectorMock.Object);
+            _contextTracker,
+            _contextInjector);
 
         var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
 
@@ -588,9 +594,8 @@ public class ThinkingChatClientContextIntegrationTests
         await client.GetResponseAsync(messages, chatOptions);
 
         // Assert
-        _contextTrackerMock.Verify(
-            x => x.Track("test-session", It.Is<ChatMessage>(m => m.Text == "Hello"), expectedResponse),
-            Times.Once);
+        _contextTracker.Received(1)
+            .Track("test-session", Arg.Is<ChatMessage>(m => m.Text == "Hello"), expectedResponse);
     }
 
     [Fact]
@@ -601,11 +606,11 @@ public class ThinkingChatClientContextIntegrationTests
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         var options = new ThinkingChatClientOptions
         {
@@ -614,18 +619,18 @@ public class ThinkingChatClientContextIntegrationTests
         };
 
         var client = new ThinkingChatClient(
-            _innerClientMock.Object,
-            _turnManagerMock.Object,
+            _innerClient,
+            _turnManager,
             options,
-            _contextTrackerMock.Object,
-            _contextInjectorMock.Object);
+            _contextTracker,
+            _contextInjector);
 
         // Act
         await client.GetResponseAsync(messages);
 
         // Assert
-        _contextTrackerMock.Verify(x => x.Track(It.IsAny<string>(), It.IsAny<ChatMessage>(), It.IsAny<ChatResponse>()), Times.Never);
-        _contextInjectorMock.Verify(x => x.InjectContext(It.IsAny<IList<ChatMessage>>(), It.IsAny<ConversationContext>()), Times.Never);
+        _contextTracker.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<ChatMessage>(), Arg.Any<ChatResponse>());
+        _contextInjector.DidNotReceive().InjectContext(Arg.Any<IList<ChatMessage>>(), Arg.Any<ConversationContext>());
     }
 
     [Fact]
@@ -636,16 +641,16 @@ public class ThinkingChatClientContextIntegrationTests
         var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
         var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
 
-        _turnManagerMock
-            .Setup(x => x.ProcessTurnAsync(
-                It.IsAny<ThinkingContext>(),
-                It.IsAny<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>()))
-            .ReturnsAsync(turnResult);
+        _turnManager
+            .ProcessTurnAsync(
+                Arg.Any<ThinkingContext>(),
+                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
 
         // No context tracker or injector
         var client = new ThinkingChatClient(
-            _innerClientMock.Object,
-            _turnManagerMock.Object);
+            _innerClient,
+            _turnManager);
 
         // Act
         var response = await client.GetResponseAsync(messages);

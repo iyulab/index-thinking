@@ -3,7 +3,7 @@ using IndexThinking.Abstractions;
 using IndexThinking.Core;
 using IndexThinking.Parsers;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Parsers;
@@ -71,15 +71,15 @@ public class ReasoningParserRegistryTests
     {
         // Arrange
         var registry = new ReasoningParserRegistry();
-        var mockParser = new Mock<IReasoningParser>();
-        mockParser.Setup(p => p.ProviderFamily).Returns("custom");
+        var mockParser = Substitute.For<IReasoningParser>();
+        mockParser.ProviderFamily.Returns("custom");
 
         // Act
-        registry.Register(mockParser.Object);
+        registry.Register(mockParser);
         var retrieved = registry.GetByProvider("custom");
 
         // Assert
-        retrieved.Should().BeSameAs(mockParser.Object);
+        retrieved.Should().BeSameAs(mockParser);
     }
 
     [Fact]

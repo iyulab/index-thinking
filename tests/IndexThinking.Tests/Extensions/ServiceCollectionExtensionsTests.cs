@@ -9,7 +9,7 @@ using IndexThinking.Continuation;
 using IndexThinking.Core;
 using IndexThinking.Extensions;
 using IndexThinking.Stores;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Extensions;
@@ -246,8 +246,8 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         // Add required dependencies
-        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
-        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton(Substitute.For<ITruncationDetector>());
+        services.AddSingleton(Substitute.For<ITokenCounter>());
         services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
 
         // Act
@@ -273,8 +273,8 @@ public class ServiceCollectionExtensionsTests
         };
 
         // Add required dependencies
-        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
-        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton(Substitute.For<ITruncationDetector>());
+        services.AddSingleton(Substitute.For<ITokenCounter>());
         services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
 
         // Act
@@ -299,8 +299,8 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         // Add required dependencies
-        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
-        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton(Substitute.For<ITruncationDetector>());
+        services.AddSingleton(Substitute.For<ITokenCounter>());
         services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
 
         // Act
@@ -330,8 +330,8 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         // Add required dependencies
-        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
-        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton(Substitute.For<ITruncationDetector>());
+        services.AddSingleton(Substitute.For<ITokenCounter>());
 
         // Act
         services.AddIndexThinkingAgents();
@@ -351,8 +351,8 @@ public class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         // Add required dependencies
-        services.AddSingleton<ITruncationDetector>(new Mock<ITruncationDetector>().Object);
-        services.AddSingleton<ITokenCounter>(new Mock<ITokenCounter>().Object);
+        services.AddSingleton(Substitute.For<ITruncationDetector>());
+        services.AddSingleton(Substitute.For<ITokenCounter>());
         services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
 
         services.AddIndexThinkingAgents();
@@ -537,7 +537,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+        services.AddSingleton(Substitute.For<IThinkingStateStore>());
 
         // Act
         services.AddIndexThinkingHealthChecks();
@@ -555,7 +555,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+        services.AddSingleton(Substitute.For<IThinkingStateStore>());
         var options = new ThinkingStateStoreHealthCheckOptions
         {
             Timeout = TimeSpan.FromSeconds(10),
@@ -579,7 +579,7 @@ public class ServiceCollectionExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddSingleton<IThinkingStateStore>(new Mock<IThinkingStateStore>().Object);
+        services.AddSingleton(Substitute.For<IThinkingStateStore>());
 
         // Act
         services.AddIndexThinkingHealthChecks(options =>

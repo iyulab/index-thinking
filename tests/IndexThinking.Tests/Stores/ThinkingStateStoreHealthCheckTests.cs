@@ -1,6 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Moq;
+using NSubstitute;
 using IndexThinking.Abstractions;
 using IndexThinking.Stores;
 using Xunit;
@@ -27,12 +27,12 @@ public class ThinkingStateStoreHealthCheckTests
     public async Task CheckHealthAsync_WhenStoreIsResponsive_ShouldReturnHealthy()
     {
         // Arrange
-        var mockStore = new Mock<IThinkingStateStore>();
+        var mockStore = Substitute.For<IThinkingStateStore>();
         mockStore
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(false));
 
-        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore.Object);
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore);
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("test", healthCheck, null, null)
@@ -51,12 +51,12 @@ public class ThinkingStateStoreHealthCheckTests
     public async Task CheckHealthAsync_WhenStoreThrows_ShouldReturnUnhealthy()
     {
         // Arrange
-        var mockStore = new Mock<IThinkingStateStore>();
+        var mockStore = Substitute.For<IThinkingStateStore>();
         mockStore
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Connection failed"));
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns<bool>(x => throw new InvalidOperationException("Connection failed"));
 
-        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore.Object);
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore);
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("test", healthCheck, null, null)
@@ -75,11 +75,12 @@ public class ThinkingStateStoreHealthCheckTests
     public async Task CheckHealthAsync_WhenTimesOut_ShouldReturnDegraded()
     {
         // Arrange
-        var mockStore = new Mock<IThinkingStateStore>();
+        var mockStore = Substitute.For<IThinkingStateStore>();
         mockStore
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Returns(async (string _, CancellationToken ct) =>
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(async callInfo =>
             {
+                var ct = callInfo.ArgAt<CancellationToken>(1);
                 await Task.Delay(TimeSpan.FromSeconds(10), ct);
                 return false;
             });
@@ -89,7 +90,7 @@ public class ThinkingStateStoreHealthCheckTests
             Timeout = TimeSpan.FromMilliseconds(50)
         };
 
-        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore.Object, options);
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore, options);
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("test", healthCheck, null, null)
@@ -108,18 +109,21 @@ public class ThinkingStateStoreHealthCheckTests
     {
         // Arrange
         var capturedSessionId = string.Empty;
-        var mockStore = new Mock<IThinkingStateStore>();
+        var mockStore = Substitute.For<IThinkingStateStore>();
         mockStore
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, CancellationToken>((id, _) => capturedSessionId = id)
-            .ReturnsAsync(false);
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedSessionId = callInfo.ArgAt<string>(0);
+                return Task.FromResult(false);
+            });
 
         var options = new ThinkingStateStoreHealthCheckOptions
         {
             TestSessionId = "__custom_test__"
         };
 
-        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore.Object, options);
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore, options);
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("test", healthCheck, null, null)
@@ -136,12 +140,12 @@ public class ThinkingStateStoreHealthCheckTests
     public async Task CheckHealthAsync_IncludesSessionExistsInData()
     {
         // Arrange
-        var mockStore = new Mock<IThinkingStateStore>();
+        var mockStore = Substitute.For<IThinkingStateStore>();
         mockStore
-            .Setup(s => s.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
 
-        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore.Object);
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore);
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("test", healthCheck, null, null)

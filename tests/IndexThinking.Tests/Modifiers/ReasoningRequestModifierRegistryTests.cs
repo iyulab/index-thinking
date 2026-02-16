@@ -2,7 +2,7 @@ using FluentAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Modifiers;
 using Microsoft.Extensions.AI;
-using Moq;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Modifiers;
@@ -28,15 +28,15 @@ public class ReasoningRequestModifierRegistryTests
     {
         // Arrange
         var registry = new ReasoningRequestModifierRegistry();
-        var mockModifier = new Mock<IReasoningRequestModifier>();
-        mockModifier.Setup(m => m.ProviderFamily).Returns("custom");
+        var mockModifier = Substitute.For<IReasoningRequestModifier>();
+        mockModifier.ProviderFamily.Returns("custom");
 
         // Act
-        registry.Register(mockModifier.Object);
+        registry.Register(mockModifier);
         var retrieved = registry.GetByProvider("custom");
 
         // Assert
-        retrieved.Should().BeSameAs(mockModifier.Object);
+        retrieved.Should().BeSameAs(mockModifier);
     }
 
     [Fact]
