@@ -143,7 +143,8 @@ static void RegisterOpenAIClient(IServiceCollection services)
     });
 }
 
-// Request/Response models
+// Request/Response models — minimal API sample, top-level statements require global scope
+#pragma warning disable CA1050 // Declare types in namespaces
 public record ChatRequest
 {
     public required string Message { get; init; }

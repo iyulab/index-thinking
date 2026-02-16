@@ -10,7 +10,7 @@ using Xunit;
 
 namespace IndexThinking.Tests.Client;
 
-public class ThinkingChatClientTests
+public class ThinkingChatClientTests : IDisposable
 {
     private readonly IChatClient _innerClient;
     private readonly IThinkingTurnManager _turnManager;
@@ -23,6 +23,12 @@ public class ThinkingChatClientTests
         _client = new ThinkingChatClient(
             _innerClient,
             _turnManager);
+    }
+
+    public void Dispose()
+    {
+        _client.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
