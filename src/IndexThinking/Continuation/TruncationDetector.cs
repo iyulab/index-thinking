@@ -347,7 +347,7 @@ public sealed class TruncationDetector : ITruncationDetector
         }
 
         // Skip heuristic if text ends with code block
-        if (trimmed.EndsWith("```"))
+        if (trimmed.EndsWith("```", StringComparison.Ordinal))
         {
             return TruncationInfo.NotTruncated;
         }

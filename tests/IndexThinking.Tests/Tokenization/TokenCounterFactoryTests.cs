@@ -18,7 +18,7 @@ public class TokenCounterFactoryTests
         counter.Should().BeOfType<TokenCounterChain>();
         var chain = (TokenCounterChain)counter;
         chain.Counters.Should().HaveCountGreaterThanOrEqualTo(1);
-        chain.Counters.First().Should().BeOfType<TiktokenTokenCounter>();
+        chain.Counters[0].Should().BeOfType<TiktokenTokenCounter>();
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public class TokenCounterFactoryTests
 
         // Default chain should include both tiktoken (default encoding) and approximate
         chain.Counters.Should().HaveCountGreaterThanOrEqualTo(2);
-        chain.Counters.First().Should().BeOfType<TiktokenTokenCounter>();
-        chain.Counters.Last().Should().BeOfType<ApproximateTokenCounter>();
+        chain.Counters[0].Should().BeOfType<TiktokenTokenCounter>();
+        chain.Counters[^1].Should().BeOfType<ApproximateTokenCounter>();
     }
 
     [Fact]
