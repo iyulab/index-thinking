@@ -76,7 +76,7 @@ public sealed record ContinuationConfig
     /// Whether to throw when max continuations is reached without completing.
     /// Default: false (returns partial response instead)
     /// </summary>
-    public bool ThrowOnMaxContinuations { get; init; } = false;
+    public bool ThrowOnMaxContinuations { get; init; }
 
     /// <summary>
     /// Validates the configuration.

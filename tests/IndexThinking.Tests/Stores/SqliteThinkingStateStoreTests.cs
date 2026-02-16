@@ -244,6 +244,7 @@ public class SqliteThinkingStateStoreFileTests : IDisposable
     public void Dispose()
     {
         _store.Dispose();
+        GC.SuppressFinalize(this);
 
         // Clear the connection pool to release file locks
         SqliteConnection.ClearAllPools();

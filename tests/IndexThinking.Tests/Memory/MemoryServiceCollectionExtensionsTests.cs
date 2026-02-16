@@ -113,7 +113,7 @@ public class MemoryServiceCollectionExtensionsTests
         action.Should().Throw<ArgumentNullException>();
     }
 
-    private class TestMemoryProvider : IMemoryProvider
+    private sealed class TestMemoryProvider : IMemoryProvider
     {
         public bool IsConfigured => true;
 

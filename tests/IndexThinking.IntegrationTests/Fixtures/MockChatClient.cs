@@ -121,7 +121,7 @@ public class MockChatClient : IChatClient
         GC.SuppressFinalize(this);
     }
 
-    public object? GetService(Type serviceType, object? key = null)
+    public object? GetService(Type serviceType, object? serviceKey = null)
     {
         if (serviceType == typeof(IChatClient))
             return this;

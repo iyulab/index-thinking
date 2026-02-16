@@ -22,6 +22,7 @@ public class InMemoryContextTrackerTests : IDisposable
     public void Dispose()
     {
         _tracker.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Fact]

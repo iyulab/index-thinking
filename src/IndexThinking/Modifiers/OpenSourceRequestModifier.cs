@@ -165,11 +165,11 @@ public class OpenSourceReasoningRequestSettings
     /// Whether to include reasoning_format field for vLLM compatibility.
     /// Default: false.
     /// </summary>
-    public bool IncludeReasoningFormat { get; set; } = false;
+    public bool IncludeReasoningFormat { get; set; }
 
     /// <summary>
     /// Whether to use enable_thinking as an alternative field for Qwen models.
     /// Default: false.
     /// </summary>
-    public bool UseAlternativeQwenField { get; set; } = false;
+    public bool UseAlternativeQwenField { get; set; }
 }

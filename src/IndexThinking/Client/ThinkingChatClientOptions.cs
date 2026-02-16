@@ -109,7 +109,7 @@ public class ThinkingChatClientOptions
     /// };
     /// </code>
     /// </example>
-    public bool EnableReasoning { get; set; } = false;
+    public bool EnableReasoning { get; set; }
 
     /// <summary>
     /// Whether to automatically detect if a model requires explicit reasoning activation.

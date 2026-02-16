@@ -34,7 +34,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatClient chatClient) =>
     {
         foreach (var msg in request.History)
         {
-            var role = msg.Role.ToLowerInvariant() == "user" ? ChatRole.User : ChatRole.Assistant;
+            var role = string.Equals(msg.Role, "user", StringComparison.OrdinalIgnoreCase) ? ChatRole.User : ChatRole.Assistant;
             messages.Add(new ChatMessage(role, msg.Content));
         }
     }

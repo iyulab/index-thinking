@@ -98,6 +98,7 @@ public class InMemoryThinkingStateStoreWithTtlTests : IDisposable
     public void Dispose()
     {
         _store.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
@@ -188,6 +189,7 @@ public class InMemoryThinkingStateStoreSlidingExpirationTests : IDisposable
     public void Dispose()
     {
         _store.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
