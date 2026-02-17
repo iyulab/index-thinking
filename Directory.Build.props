@@ -9,8 +9,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- CA1068/CA1711/CA1720: API breaking change — deferred to major version -->
-    <NoWarn>$(NoWarn);CS1591;CA1068;CA1711;CA1720</NoWarn>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <Version>0.16.0</Version>
   </PropertyGroup>
 

@@ -212,7 +212,7 @@ public static class ServiceCollectionExtensions
     /// </remarks>
     public static IServiceCollection AddIndexThinkingMemory(
         this IServiceCollection services,
-        MemoryRecallDelegate recallDelegate)
+        MemoryRecallHandler recallDelegate)
     {
         return services.AddIndexThinkingMemory(recallDelegate, null);
     }
@@ -261,8 +261,8 @@ public static class ServiceCollectionExtensions
     /// </remarks>
     public static IServiceCollection AddIndexThinkingMemory(
         this IServiceCollection services,
-        MemoryRecallDelegate recallDelegate,
-        MemoryRememberDelegate? rememberDelegate)
+        MemoryRecallHandler recallDelegate,
+        MemoryRememberHandler? rememberDelegate)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(recallDelegate);

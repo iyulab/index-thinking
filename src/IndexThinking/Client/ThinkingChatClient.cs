@@ -95,7 +95,7 @@ public class ThinkingChatClient : DelegatingChatClient
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
         // Create thinking context from messages and options
-        var context = CreateContext(enrichedMessages, modifiedOptions, cancellationToken, sessionId);
+        var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
 
         // Process through turn manager
         var turnResult = await _turnManager.ProcessTurnAsync(
@@ -161,7 +161,7 @@ public class ThinkingChatClient : DelegatingChatClient
         {
             var aggregatedResponse = collectedUpdates.ToChatResponse();
 
-            var context = CreateContext(enrichedMessages, modifiedOptions, cancellationToken, sessionId);
+            var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
 
             var turnResult = await _turnManager.ProcessTurnAsync(
                 context,
@@ -205,8 +205,8 @@ public class ThinkingChatClient : DelegatingChatClient
     private ThinkingContext CreateContext(
         IList<ChatMessage> messages,
         ChatOptions? options,
-        CancellationToken cancellationToken,
-        string sessionId)
+        string sessionId,
+        CancellationToken cancellationToken)
     {
         var context = ThinkingContext.Create(sessionId, messages)
             .WithBudget(_options.DefaultBudget)

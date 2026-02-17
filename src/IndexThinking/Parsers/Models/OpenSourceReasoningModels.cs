@@ -173,7 +173,7 @@ public class OpenSourceChatCompletion
     /// Object type (usually "chat.completion").
     /// </summary>
     [JsonPropertyName("object")]
-    public string? Object { get; set; }
+    public string? ObjectType { get; set; }
 
     /// <summary>
     /// Unix timestamp when the completion was created.

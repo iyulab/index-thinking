@@ -9,7 +9,7 @@ namespace IndexThinking.Memory;
 /// This delegate matches the signature of Memory-Indexer's RecallAsync,
 /// allowing easy integration without direct package dependency.
 /// </remarks>
-public delegate Task<MemoryRecallResult> MemoryRecallDelegate(
+public delegate Task<MemoryRecallResult> MemoryRecallHandler(
     string userId,
     string? sessionId,
     string query,
@@ -22,7 +22,7 @@ public delegate Task<MemoryRecallResult> MemoryRecallDelegate(
 /// <remarks>
 /// This delegate allows storing memories to any backend without direct package dependency.
 /// </remarks>
-public delegate Task MemoryRememberDelegate(
+public delegate Task MemoryRememberHandler(
     string userId,
     string? sessionId,
     IEnumerable<MemoryStoreRequest> memories,
@@ -95,15 +95,15 @@ public sealed record MemoryRecallResult
 /// </remarks>
 public sealed class FuncMemoryProvider : IMemoryProvider
 {
-    private readonly MemoryRecallDelegate _recallDelegate;
-    private readonly MemoryRememberDelegate? _rememberDelegate;
+    private readonly MemoryRecallHandler _recallDelegate;
+    private readonly MemoryRememberHandler? _rememberDelegate;
 
     /// <summary>
     /// Creates a new <see cref="FuncMemoryProvider"/> with the specified recall delegate.
     /// </summary>
     /// <param name="recallDelegate">The delegate that performs memory recall.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="recallDelegate"/> is null.</exception>
-    public FuncMemoryProvider(MemoryRecallDelegate recallDelegate)
+    public FuncMemoryProvider(MemoryRecallHandler recallDelegate)
         : this(recallDelegate, null)
     {
     }
@@ -115,8 +115,8 @@ public sealed class FuncMemoryProvider : IMemoryProvider
     /// <param name="rememberDelegate">The optional delegate that performs memory storage.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="recallDelegate"/> is null.</exception>
     public FuncMemoryProvider(
-        MemoryRecallDelegate recallDelegate,
-        MemoryRememberDelegate? rememberDelegate)
+        MemoryRecallHandler recallDelegate,
+        MemoryRememberHandler? rememberDelegate)
     {
         _recallDelegate = recallDelegate ?? throw new ArgumentNullException(nameof(recallDelegate));
         _rememberDelegate = rememberDelegate;

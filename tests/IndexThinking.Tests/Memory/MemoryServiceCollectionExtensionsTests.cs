@@ -62,7 +62,7 @@ public class MemoryServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         // Act
-        var action = () => services.AddIndexThinkingMemory((MemoryRecallDelegate)null!);
+        var action = () => services.AddIndexThinkingMemory((MemoryRecallHandler)null!);
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
