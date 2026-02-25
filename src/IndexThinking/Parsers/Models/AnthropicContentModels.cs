@@ -14,7 +14,7 @@ public abstract record AnthropicContentBlock
     /// <summary>
     /// The type of content block.
     /// </summary>
-    [JsonPropertyName("type")]
+    [JsonIgnore]
     public abstract string Type { get; }
 }
 
@@ -28,7 +28,7 @@ public abstract record AnthropicContentBlock
 public sealed record AnthropicThinkingBlock : AnthropicContentBlock
 {
     /// <inheritdoc />
-    [JsonPropertyName("type")]
+    [JsonIgnore]
     public override string Type => "thinking";
 
     /// <summary>
@@ -55,7 +55,7 @@ public sealed record AnthropicThinkingBlock : AnthropicContentBlock
 public sealed record AnthropicRedactedThinkingBlock : AnthropicContentBlock
 {
     /// <inheritdoc />
-    [JsonPropertyName("type")]
+    [JsonIgnore]
     public override string Type => "redacted_thinking";
 
     /// <summary>
@@ -71,7 +71,7 @@ public sealed record AnthropicRedactedThinkingBlock : AnthropicContentBlock
 public sealed record AnthropicTextBlock : AnthropicContentBlock
 {
     /// <inheritdoc />
-    [JsonPropertyName("type")]
+    [JsonIgnore]
     public override string Type => "text";
 
     /// <summary>

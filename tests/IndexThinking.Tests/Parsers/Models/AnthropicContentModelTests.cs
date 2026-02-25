@@ -272,3 +272,148 @@ public class AnthropicMessageResponseTests
         ((AnthropicRedactedThinkingBlock)response.Content[0]).Data.Should().Be("encrypted-content");
     }
 }
+
+public class AnthropicContentBlockPolymorphicTests
+{
+    [Fact]
+    public void Serialize_ThinkingBlock_AsBaseType_ShouldIncludeDiscriminator()
+    {
+        AnthropicContentBlock block = new AnthropicThinkingBlock
+        {
+            Thinking = "reasoning text",
+            Signature = "sig-abc"
+        };
+
+        var json = JsonSerializer.Serialize(block);
+
+        json.Should().Contain("\"type\":\"thinking\"");
+        json.Should().Contain("\"thinking\":\"reasoning text\"");
+        json.Should().Contain("\"signature\":\"sig-abc\"");
+    }
+
+    [Fact]
+    public void Serialize_TextBlock_AsBaseType_ShouldIncludeDiscriminator()
+    {
+        AnthropicContentBlock block = new AnthropicTextBlock { Text = "hello world" };
+
+        var json = JsonSerializer.Serialize(block);
+
+        json.Should().Contain("\"type\":\"text\"");
+        json.Should().Contain("\"text\":\"hello world\"");
+    }
+
+    [Fact]
+    public void Serialize_RedactedThinkingBlock_AsBaseType_ShouldIncludeDiscriminator()
+    {
+        AnthropicContentBlock block = new AnthropicRedactedThinkingBlock { Data = "enc-data" };
+
+        var json = JsonSerializer.Serialize(block);
+
+        json.Should().Contain("\"type\":\"redacted_thinking\"");
+        json.Should().Contain("\"data\":\"enc-data\"");
+    }
+
+    [Fact]
+    public void Deserialize_ThinkingBlock_AsBaseType_ShouldResolveCorrectType()
+    {
+        var json = """{"type":"thinking","thinking":"deep thought","signature":"sig-123"}""";
+
+        var block = JsonSerializer.Deserialize<AnthropicContentBlock>(json);
+
+        block.Should().BeOfType<AnthropicThinkingBlock>();
+        var thinking = (AnthropicThinkingBlock)block!;
+        thinking.Thinking.Should().Be("deep thought");
+        thinking.Signature.Should().Be("sig-123");
+        thinking.Type.Should().Be("thinking");
+    }
+
+    [Fact]
+    public void Deserialize_TextBlock_AsBaseType_ShouldResolveCorrectType()
+    {
+        var json = """{"type":"text","text":"The answer is 42."}""";
+
+        var block = JsonSerializer.Deserialize<AnthropicContentBlock>(json);
+
+        block.Should().BeOfType<AnthropicTextBlock>();
+        var text = (AnthropicTextBlock)block!;
+        text.Text.Should().Be("The answer is 42.");
+        text.Type.Should().Be("text");
+    }
+
+    [Fact]
+    public void Deserialize_RedactedThinkingBlock_AsBaseType_ShouldResolveCorrectType()
+    {
+        var json = """{"type":"redacted_thinking","data":"encrypted-payload"}""";
+
+        var block = JsonSerializer.Deserialize<AnthropicContentBlock>(json);
+
+        block.Should().BeOfType<AnthropicRedactedThinkingBlock>();
+        var redacted = (AnthropicRedactedThinkingBlock)block!;
+        redacted.Data.Should().Be("encrypted-payload");
+        redacted.Type.Should().Be("redacted_thinking");
+    }
+
+    [Fact]
+    public void Roundtrip_PolymorphicSerialization_ShouldPreserveTypes()
+    {
+        AnthropicContentBlock[] original =
+        [
+            new AnthropicThinkingBlock { Thinking = "step 1", Signature = "sig-1" },
+            new AnthropicRedactedThinkingBlock { Data = "redacted-data" },
+            new AnthropicTextBlock { Text = "final answer" }
+        ];
+
+        var json = JsonSerializer.Serialize(original);
+        var deserialized = JsonSerializer.Deserialize<AnthropicContentBlock[]>(json);
+
+        deserialized.Should().NotBeNull();
+        deserialized.Should().HaveCount(3);
+        deserialized![0].Should().BeOfType<AnthropicThinkingBlock>();
+        deserialized[1].Should().BeOfType<AnthropicRedactedThinkingBlock>();
+        deserialized[2].Should().BeOfType<AnthropicTextBlock>();
+
+        var thinking = (AnthropicThinkingBlock)deserialized[0];
+        thinking.Thinking.Should().Be("step 1");
+        thinking.Signature.Should().Be("sig-1");
+
+        var redacted = (AnthropicRedactedThinkingBlock)deserialized[1];
+        redacted.Data.Should().Be("redacted-data");
+
+        var text = (AnthropicTextBlock)deserialized[2];
+        text.Text.Should().Be("final answer");
+    }
+
+    [Fact]
+    public void Roundtrip_MessageResponse_WithPolymorphicContent_ShouldWork()
+    {
+        var original = new AnthropicMessageResponse
+        {
+            Content =
+            [
+                new AnthropicThinkingBlock { Thinking = "analysis", Signature = "sig" },
+                new AnthropicTextBlock { Text = "result" }
+            ],
+            Model = "claude-sonnet-4-20250514",
+            StopReason = "end_turn",
+            Usage = new AnthropicUsage
+            {
+                InputTokens = 100,
+                OutputTokens = 200,
+                ThinkingTokens = 50
+            }
+        };
+
+        var json = JsonSerializer.Serialize(original);
+        var deserialized = JsonSerializer.Deserialize<AnthropicMessageResponse>(json);
+
+        deserialized.Should().NotBeNull();
+        deserialized!.Content.Should().HaveCount(2);
+        deserialized.Content![0].Should().BeOfType<AnthropicThinkingBlock>();
+        deserialized.Content[1].Should().BeOfType<AnthropicTextBlock>();
+        deserialized.Model.Should().Be("claude-sonnet-4-20250514");
+        deserialized.StopReason.Should().Be("end_turn");
+        deserialized.Usage!.InputTokens.Should().Be(100);
+        deserialized.Usage.OutputTokens.Should().Be(200);
+        deserialized.Usage.ThinkingTokens.Should().Be(50);
+    }
+}
