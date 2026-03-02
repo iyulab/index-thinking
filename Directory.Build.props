@@ -33,6 +33,13 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
+  <!-- Local NuGet package source for development -->
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)../../local-packages')">
+    <RestoreAdditionalProjectSources>
+      $(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../local-packages
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
   <!-- Deterministic builds for CI -->
   <PropertyGroup Condition="'$(CI)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>

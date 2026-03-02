@@ -222,4 +222,51 @@ public class TokenCounterChainTests
         gptCount.Should().Be(2); // Exact tiktoken count
         claudeCount.Should().BeGreaterThan(0); // Approximate count
     }
+
+    [Fact]
+    public void Count_EnumerableTexts_DelegatesToCounter()
+    {
+        // Arrange
+        var mockCounter = Substitute.For<ITokenCounter>();
+        var texts = new[] { "Hello", "World" };
+        mockCounter.SupportsModel(Arg.Any<string>()).Returns(true);
+        mockCounter.Count(texts).Returns(42);
+
+        var chain = new TokenCounterChain(new[] { mockCounter })
+            .WithModel("test");
+
+        // Act
+        var count = chain.Count(texts);
+
+        // Assert
+        count.Should().Be(42);
+    }
+
+    [Fact]
+    public void Count_EnumerableTexts_WithNoModel_UsesFirstCounter()
+    {
+        // Arrange
+        var mockCounter1 = Substitute.For<ITokenCounter>();
+        var mockCounter2 = Substitute.For<ITokenCounter>();
+        var texts = new[] { "Hello", "World" };
+        mockCounter1.Count(texts).Returns(10);
+
+        var chain = new TokenCounterChain(new[] { mockCounter1, mockCounter2 });
+
+        // Act
+        var count = chain.Count(texts);
+
+        // Assert
+        count.Should().Be(10);
+        mockCounter1.Received(1).Count(texts);
+        mockCounter2.DidNotReceive().Count(Arg.Any<IEnumerable<string>>());
+    }
+
+    [Fact]
+    public void ImplementsTokenMeterAbstractionsInterface()
+    {
+        // Verify that TokenCounterChain implements the base interface
+        var chain = new TokenCounterChain(new[] { new ApproximateTokenCounter() });
+        chain.Should().BeAssignableTo<TokenMeter.Abstractions.ITokenCounter>();
+    }
 }

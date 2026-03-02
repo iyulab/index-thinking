@@ -63,6 +63,13 @@ public sealed class ApproximateTokenCounter : ITokenCounter
     }
 
     /// <inheritdoc />
+    public int Count(IEnumerable<string> texts)
+    {
+        ArgumentNullException.ThrowIfNull(texts);
+        return texts.Sum(t => Count(t));
+    }
+
+    /// <inheritdoc />
     public int Count(ChatMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
@@ -85,6 +92,14 @@ public sealed class ApproximateTokenCounter : ITokenCounter
     /// Always returns true as this is a fallback counter that can estimate tokens for any model.
     /// </remarks>
     public bool SupportsModel(string modelId) => true;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Always returns true as this counter uses heuristic character-to-token ratios.
+    /// </remarks>
+#pragma warning disable CA1822 // Interface method override cannot be static
+    public bool IsApproximate(string modelId) => true;
+#pragma warning restore CA1822
 
     /// <summary>
     /// Detects the primary language of the text.

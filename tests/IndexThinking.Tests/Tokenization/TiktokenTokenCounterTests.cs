@@ -184,4 +184,57 @@ public class TiktokenTokenCounterTests
         // Assert
         _counter.Encoding.Should().Be(ModelEncodingRegistry.O200kBase);
     }
+
+    [Fact]
+    public void Count_EnumerableTexts_ReturnsSumOfIndividualCounts()
+    {
+        // Arrange
+        var texts = new[] { "Hello", " World", "!" };
+        var expected = texts.Sum(t => _counter.Count(t));
+
+        // Act
+        var count = _counter.Count(texts);
+
+        // Assert
+        count.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Count_EmptyEnumerable_ReturnsZero()
+    {
+        // Act
+        var count = _counter.Count(Array.Empty<string>());
+
+        // Assert
+        count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Count_NullEnumerable_ThrowsArgumentNullException()
+    {
+        // Act
+        var action = () => _counter.Count((IEnumerable<string>)null!);
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void IsApproximate_AnyModel_ReturnsFalse()
+    {
+        // TiktokenTokenCounter is exact, not approximate
+        // The DIM from TokenMeter.Abstractions.ITokenCounter defaults to false
+        // CA1859: interface type required to access default interface method
+#pragma warning disable CA1859
+        global::TokenMeter.Abstractions.ITokenCounter baseCounter = _counter;
+#pragma warning restore CA1859
+        baseCounter.IsApproximate("gpt-4o").Should().BeFalse();
+    }
+
+    [Fact]
+    public void ImplementsTokenMeterAbstractionsInterface()
+    {
+        // Verify that TiktokenTokenCounter implements the base interface
+        _counter.Should().BeAssignableTo<global::TokenMeter.Abstractions.ITokenCounter>();
+    }
 }

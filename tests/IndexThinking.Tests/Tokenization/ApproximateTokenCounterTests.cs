@@ -223,4 +223,54 @@ public class ApproximateTokenCounterTests
         // Actual tiktoken count is around 20, so 22 is within 20% margin
         count.Should().BeInRange(15, 30);
     }
+
+    [Fact]
+    public void Count_EnumerableTexts_ReturnsSumOfIndividualCounts()
+    {
+        // Arrange
+        var texts = new[] { "Hello World", "안녕하세요", "The quick brown fox" };
+        var expected = texts.Sum(t => _counter.Count(t));
+
+        // Act
+        var count = _counter.Count(texts);
+
+        // Assert
+        count.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Count_EmptyEnumerable_ReturnsZero()
+    {
+        // Act
+        var count = _counter.Count(Array.Empty<string>());
+
+        // Assert
+        count.Should().Be(0);
+    }
+
+    [Fact]
+    public void Count_NullEnumerable_ThrowsArgumentNullException()
+    {
+        // Act
+        var action = () => _counter.Count((IEnumerable<string>)null!);
+
+        // Assert
+        action.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void IsApproximate_AnyModel_ReturnsTrue()
+    {
+        // ApproximateTokenCounter uses heuristic ratios, always approximate
+        _counter.IsApproximate("gpt-4o").Should().BeTrue();
+        _counter.IsApproximate("claude-3").Should().BeTrue();
+        _counter.IsApproximate("any-model").Should().BeTrue();
+    }
+
+    [Fact]
+    public void ImplementsTokenMeterAbstractionsInterface()
+    {
+        // Verify that ApproximateTokenCounter implements the base interface
+        _counter.Should().BeAssignableTo<TokenMeter.Abstractions.ITokenCounter>();
+    }
 }

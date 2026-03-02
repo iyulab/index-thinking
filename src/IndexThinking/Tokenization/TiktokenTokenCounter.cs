@@ -56,6 +56,13 @@ public sealed class TiktokenTokenCounter : ITokenCounter
     }
 
     /// <inheritdoc />
+    public int Count(IEnumerable<string> texts)
+    {
+        ArgumentNullException.ThrowIfNull(texts);
+        return texts.Sum(t => Count(t));
+    }
+
+    /// <inheritdoc />
     public int Count(ChatMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);

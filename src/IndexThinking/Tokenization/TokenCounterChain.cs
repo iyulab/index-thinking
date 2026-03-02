@@ -52,6 +52,13 @@ public sealed class TokenCounterChain : ITokenCounter
     }
 
     /// <inheritdoc />
+    public int Count(IEnumerable<string> texts)
+    {
+        var counter = GetSupportingCounter();
+        return counter.Count(texts);
+    }
+
+    /// <inheritdoc />
     public int Count(ChatMessage message)
     {
         var counter = GetSupportingCounter();
