@@ -52,11 +52,11 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         var continuationCount = 0;
         var currentResponse = initialResponse;
 
-        // Collect initial fragment
+        // Collect initial fragment (strip think tags per-fragment so combined text is clean)
         var initialText = GetResponseText(initialResponse);
         if (!string.IsNullOrEmpty(initialText))
         {
-            fragments.Add(initialText);
+            fragments.Add(OpenSourceReasoningParser.StripThinkTags(initialText));
         }
 
         // Continuation loop
@@ -85,11 +85,11 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             continuationCount++;
             intermediateResponses.Add(nextResponse);
 
-            // Collect fragment
+            // Collect fragment (strip think tags per-fragment so combined text is clean)
             var nextText = GetResponseText(nextResponse);
             if (!string.IsNullOrEmpty(nextText))
             {
-                fragments.Add(nextText);
+                fragments.Add(OpenSourceReasoningParser.StripThinkTags(nextText));
             }
 
             currentResponse = nextResponse;

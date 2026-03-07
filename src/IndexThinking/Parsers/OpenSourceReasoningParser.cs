@@ -239,9 +239,11 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
         // Handle orphaned </think> without matching <think>.
         // Some OpenAI SDK adapters strip the opening <think> tag, leaving:
         //   "thinking content</think>\n\nactual content"
-        var endIdx = text.IndexOf("</think>", StringComparison.Ordinal);
-        if (endIdx >= 0)
+        // Loop to handle multiple orphaned occurrences (e.g. combined continuation fragments).
+        while (true)
         {
+            var endIdx = text.IndexOf("</think>", StringComparison.Ordinal);
+            if (endIdx < 0) break;
             text = text[(endIdx + "</think>".Length)..];
         }
 
