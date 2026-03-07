@@ -85,11 +85,10 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
             // 5. Parse reasoning from final response
             var (thinkingContent, reasoningState) = ParseReasoning(continuationResult.FinalResponse);
 
-            // 5a. Strip think tags from response so consumers get clean content
-            if (thinkingContent is not null)
-            {
-                StripThinkTagsFromResponse(continuationResult.FinalResponse);
-            }
+            // 5a. Strip think tags from response so consumers get clean content.
+            // Always attempt stripping — even when thinkingContent is null,
+            // orphaned </think> tags may remain (e.g., OpenAI SDK strips opening <think>).
+            StripThinkTagsFromResponse(continuationResult.FinalResponse);
 
             // 6. Record metrics
             _budgetTracker.RecordResponse(continuationResult.FinalResponse, thinkingContent);

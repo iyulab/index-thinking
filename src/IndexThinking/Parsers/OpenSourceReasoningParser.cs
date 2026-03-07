@@ -233,7 +233,19 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
             return text;
         }
 
-        return ThinkTagsRegex().Replace(text, "").Trim();
+        // Strip complete <think>...</think> blocks
+        text = ThinkTagsRegex().Replace(text, "");
+
+        // Handle orphaned </think> without matching <think>.
+        // Some OpenAI SDK adapters strip the opening <think> tag, leaving:
+        //   "thinking content</think>\n\nactual content"
+        var endIdx = text.IndexOf("</think>", StringComparison.Ordinal);
+        if (endIdx >= 0)
+        {
+            text = text[(endIdx + "</think>".Length)..];
+        }
+
+        return text.Trim();
     }
 
     /// <summary>
@@ -426,6 +438,12 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
         var startIndex = text.IndexOf(_config.StartToken, StringComparison.Ordinal);
         if (startIndex < 0)
         {
+            // Handle orphaned end token (opening tag stripped by OpenAI SDK adapter)
+            var orphanedEnd = text.IndexOf(_config.EndToken, StringComparison.Ordinal);
+            if (orphanedEnd > 0)
+            {
+                return text[..orphanedEnd].Trim();
+            }
             return null;
         }
 
