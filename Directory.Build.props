@@ -10,7 +10,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <Version>0.17.3</Version>
+    <Version>0.17.4</Version>
   </PropertyGroup>
 
   <!-- NuGet Package Metadata -->
