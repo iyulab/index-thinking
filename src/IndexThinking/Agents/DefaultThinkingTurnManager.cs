@@ -1,5 +1,6 @@
 using IndexThinking.Abstractions;
 using IndexThinking.Core;
+using IndexThinking.Parsers;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Agents;
@@ -84,6 +85,12 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
             // 5. Parse reasoning from final response
             var (thinkingContent, reasoningState) = ParseReasoning(continuationResult.FinalResponse);
 
+            // 5a. Strip think tags from response so consumers get clean content
+            if (thinkingContent is not null)
+            {
+                StripThinkTagsFromResponse(continuationResult.FinalResponse);
+            }
+
             // 6. Record metrics
             _budgetTracker.RecordResponse(continuationResult.FinalResponse, thinkingContent);
             var usage = _budgetTracker.GetUsage();
@@ -119,6 +126,24 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
             total += _tokenCounter.Count(message);
         }
         return total;
+    }
+
+    private static void StripThinkTagsFromResponse(ChatResponse response)
+    {
+        foreach (var message in response.Messages)
+        {
+            for (var i = 0; i < message.Contents.Count; i++)
+            {
+                if (message.Contents[i] is TextContent textContent)
+                {
+                    var stripped = OpenSourceReasoningParser.StripThinkTags(textContent.Text);
+                    if (stripped != textContent.Text)
+                    {
+                        message.Contents[i] = new TextContent(stripped);
+                    }
+                }
+            }
+        }
     }
 
     private (ThinkingContent?, ReasoningState?) ParseReasoning(ChatResponse response)

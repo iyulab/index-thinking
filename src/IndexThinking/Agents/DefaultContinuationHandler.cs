@@ -1,5 +1,6 @@
 using IndexThinking.Abstractions;
 using IndexThinking.Continuation;
+using IndexThinking.Parsers;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Agents;
@@ -139,6 +140,9 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             var previousText = GetResponseText(previousResponse);
             if (!string.IsNullOrEmpty(previousText))
             {
+                // Strip think tags from assistant context so the model
+                // doesn't treat its own reasoning as conversation content
+                previousText = OpenSourceReasoningParser.StripThinkTags(previousText);
                 messages.Add(new ChatMessage(ChatRole.Assistant, previousText));
             }
         }

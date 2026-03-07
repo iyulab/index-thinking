@@ -270,6 +270,56 @@ public class DefaultThinkingTurnManagerTests
         return ThinkingContext.Create("test-session", [new ChatMessage(ChatRole.User, "Test message")]);
     }
 
+    [Fact]
+    public async Task ProcessTurnAsync_WithThinkTags_StripsTagsFromResponse()
+    {
+        // Arrange
+        var context = CreateContext();
+        var response = CreateResponse("<think>internal reasoning</think>\n\nClean answer");
+        var thinking = new ThinkingContent { Text = "internal reasoning" };
+
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
+
+        _parser
+            .TryParse(response, out Arg.Any<ThinkingContent?>())
+            .Returns(callInfo =>
+            {
+                callInfo[1] = thinking;
+                return true;
+            });
+
+        // Act
+        var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
+
+        // Assert
+        Assert.DoesNotContain("<think>", result.Response.Text);
+        Assert.DoesNotContain("</think>", result.Response.Text);
+        Assert.Contains("Clean answer", result.Response.Text);
+        Assert.True(result.HasThinkingContent);
+        Assert.Equal("internal reasoning", result.ThinkingContent?.Text);
+    }
+
+    [Fact]
+    public async Task ProcessTurnAsync_WithoutThinkingContent_DoesNotModifyResponse()
+    {
+        // Arrange
+        var context = CreateContext();
+        var responseText = "Normal response without think tags";
+        var response = CreateResponse(responseText);
+
+        _continuationHandler
+            .HandleAsync(context, response, Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(ContinuationResult.NotTruncated(response)));
+
+        // Act
+        var result = await _manager.ProcessTurnAsync(context, (_, _) => Task.FromResult(response));
+
+        // Assert
+        Assert.Equal(responseText, result.Response.Text);
+    }
+
     private static ChatResponse CreateResponse(string text)
     {
         var message = new ChatMessage(ChatRole.Assistant, text);

@@ -271,6 +271,46 @@ public class DefaultContinuationHandlerTests
         return Task.FromResult(CreateResponse("Mock response"));
     }
 
+    [Fact]
+    public async Task HandleAsync_TruncatedWithThinkTags_StripsTagsFromContinuationContext()
+    {
+        // Arrange
+        var context = CreateContext();
+        var initialResponse = CreateResponse("<think>reasoning about the task</think>\n\nFirst part of answer");
+        var continuationResponse = CreateResponse("Second part of answer");
+
+        var callCount = 0;
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
+
+        IList<ChatMessage>? capturedMessages = null;
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedMessages = callInfo.ArgAt<IList<ChatMessage>>(0);
+                return Task.FromResult(continuationResponse);
+            });
+
+        // Act
+        await _handler.HandleAsync(context, initialResponse, sendRequest);
+
+        // Assert - the assistant message in continuation should NOT contain think tags
+        Assert.NotNull(capturedMessages);
+        var assistantMessage = capturedMessages!.FirstOrDefault(m => m.Role == ChatRole.Assistant);
+        Assert.NotNull(assistantMessage);
+        Assert.DoesNotContain("<think>", assistantMessage!.Text);
+        Assert.DoesNotContain("</think>", assistantMessage.Text);
+        Assert.Contains("First part of answer", assistantMessage.Text);
+    }
+
     private static Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>> CreateSendRequestSubstitute(
         ChatResponse response)
     {

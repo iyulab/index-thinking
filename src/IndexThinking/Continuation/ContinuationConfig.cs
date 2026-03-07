@@ -53,7 +53,7 @@ public sealed record ContinuationConfig
     /// Use {previous_response} placeholder for the truncated text.
     /// Default: "Please continue from where you left off."
     /// </summary>
-    public string ContinuationPrompt { get; init; } = "Please continue from where you left off.";
+    public string ContinuationPrompt { get; init; } = "Continue the response directly from where it was cut off. Do not repeat any previous content.";
 
     /// <summary>
     /// Whether to include truncated response in continuation request.

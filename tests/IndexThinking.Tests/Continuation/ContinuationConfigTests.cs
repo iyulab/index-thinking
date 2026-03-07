@@ -18,7 +18,7 @@ public class ContinuationConfigTests
         config.DelayBetweenContinuations.Should().Be(TimeSpan.Zero);
         config.EnableJsonRecovery.Should().BeTrue();
         config.EnableCodeBlockRecovery.Should().BeTrue();
-        config.ContinuationPrompt.Should().Be("Please continue from where you left off.");
+        config.ContinuationPrompt.Should().Be("Continue the response directly from where it was cut off. Do not repeat any previous content.");
         config.IncludePreviousResponse.Should().BeTrue();
         config.MinProgressPerContinuation.Should().Be(10);
         config.ThrowOnMaxContinuations.Should().BeFalse();
