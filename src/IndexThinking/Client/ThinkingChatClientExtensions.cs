@@ -70,11 +70,13 @@ public static class ThinkingChatClientExtensions
             var turnManager = services.GetRequiredService<IThinkingTurnManager>();
             var contextTracker = services.GetService<IContextTracker>();
             var contextInjector = services.GetService<IContextInjector>();
+            var tokenCounter = services.GetService<ITokenCounter>();
 
             var options = new ThinkingChatClientOptions();
             configure?.Invoke(options);
 
-            return new ThinkingChatClient(innerClient, turnManager, options, contextTracker, contextInjector);
+            return new ThinkingChatClient(innerClient, turnManager, options, contextTracker, contextInjector,
+                tokenCounter: tokenCounter);
         });
     }
 

@@ -95,7 +95,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             // Build continuation messages
             var continuationMessages = BuildContinuationMessages(context, currentResponse, config);
 
-            // Validate context token budget before sending
+            // Validate context token budget — if over limit, compact messages
             if (config.MaxContextTokens is > 0)
             {
                 var estimatedTokens = EstimateContinuationTokens(
@@ -103,7 +103,24 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
 
                 if (estimatedTokens > config.MaxContextTokens.Value)
                 {
-                    break;
+                    // Compact: drop original user content, keep system + response tail
+                    continuationMessages = BuildCompactContinuationMessages(
+                        context, currentResponse, config, config.MaxContextTokens.Value);
+
+                    // Re-estimate with compacted messages
+                    var compactTokens = 0;
+                    foreach (var msg in continuationMessages)
+                    {
+                        compactTokens += _tokenCounter.Count(msg);
+                    }
+
+                    if (compactTokens > config.MaxContextTokens.Value)
+                    {
+                        break; // Even compacted messages don't fit
+                    }
+
+                    // Reset baseline for compacted requests
+                    promptTokenBaseline = null;
                 }
             }
 
@@ -216,6 +233,86 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         messages.Add(new ChatMessage(ChatRole.User, config.ContinuationPrompt));
 
         return messages;
+    }
+
+    /// <summary>
+    /// Builds compacted continuation messages when full messages exceed context limit.
+    /// Drops original user content (already processed), keeps system prompt +
+    /// tail of previous response + continuation prompt.
+    /// </summary>
+    private List<ChatMessage> BuildCompactContinuationMessages(
+        ThinkingContext context,
+        ChatResponse previousResponse,
+        ContinuationConfig config,
+        int maxContextTokens)
+    {
+        var messages = new List<ChatMessage>();
+
+        // Keep system message only (format instructions)
+        var systemMessage = context.Messages.FirstOrDefault(m => m.Role == ChatRole.System);
+        if (systemMessage is not null)
+        {
+            messages.Add(systemMessage);
+        }
+
+        // Include previous response (the model needs to know where it left off)
+        if (config.IncludePreviousResponse)
+        {
+            var previousText = GetResponseText(previousResponse);
+            if (!string.IsNullOrEmpty(previousText))
+            {
+                previousText = OpenSourceReasoningParser.StripThinkTags(previousText);
+
+                // Calculate budget for the response tail
+                var systemTokens = systemMessage is not null ? _tokenCounter.Count(systemMessage) : 0;
+                var promptTokens = _tokenCounter.Count(config.ContinuationPrompt);
+                // Reserve half the remaining budget for the model's output
+                var responseBudget = (maxContextTokens - systemTokens - promptTokens) / 2;
+
+                if (responseBudget > 0)
+                {
+                    var responseTokens = _tokenCounter.Count(previousText);
+                    if (responseTokens > responseBudget)
+                    {
+                        // Truncate to tail: keep the last portion
+                        previousText = TruncateToTail(previousText, responseBudget);
+                    }
+                }
+
+                messages.Add(new ChatMessage(ChatRole.Assistant, previousText));
+            }
+        }
+
+        // Add continuation prompt
+        messages.Add(new ChatMessage(ChatRole.User, config.ContinuationPrompt));
+
+        return messages;
+    }
+
+    /// <summary>
+    /// Truncates text to approximately the last N tokens worth of content.
+    /// Tries to break at a newline boundary for cleaner continuation.
+    /// </summary>
+    private string TruncateToTail(string text, int targetTokens)
+    {
+        // Approximate: use ratio of target/total tokens to determine character position
+        var totalTokens = _tokenCounter.Count(text);
+        if (totalTokens <= targetTokens)
+        {
+            return text;
+        }
+
+        var ratio = (double)targetTokens / totalTokens;
+        var startChar = (int)(text.Length * (1 - ratio));
+
+        // Try to find a newline boundary near the cut point
+        var newlinePos = text.IndexOf('\n', startChar);
+        if (newlinePos >= 0 && newlinePos < startChar + 200)
+        {
+            startChar = newlinePos + 1;
+        }
+
+        return text[startChar..];
     }
 
     private static string GetResponseText(ChatResponse response)

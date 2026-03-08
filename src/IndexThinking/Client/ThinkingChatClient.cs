@@ -33,6 +33,7 @@ public class ThinkingChatClient : DelegatingChatClient
     private readonly IContextInjector? _contextInjector;
     private readonly IndexThinkingMeter? _meter;
     private readonly ReasoningRequestModifierRegistry? _modifierRegistry;
+    private readonly ITokenCounter? _tokenCounter;
 
     /// <summary>
     /// Metadata key for storing <see cref="ThinkingContent"/> in the response.
@@ -59,6 +60,7 @@ public class ThinkingChatClient : DelegatingChatClient
     /// <param name="contextInjector">Optional context injector for message enrichment.</param>
     /// <param name="meter">Optional meter for IndexThinking-specific metrics.</param>
     /// <param name="modifierRegistry">Optional registry for reasoning request modifiers.</param>
+    /// <param name="tokenCounter">Optional token counter for auto-capping MaxOutputTokens.</param>
     public ThinkingChatClient(
         IChatClient innerClient,
         IThinkingTurnManager turnManager,
@@ -66,7 +68,8 @@ public class ThinkingChatClient : DelegatingChatClient
         IContextTracker? contextTracker = null,
         IContextInjector? contextInjector = null,
         IndexThinkingMeter? meter = null,
-        ReasoningRequestModifierRegistry? modifierRegistry = null)
+        ReasoningRequestModifierRegistry? modifierRegistry = null,
+        ITokenCounter? tokenCounter = null)
         : base(innerClient)
     {
         _turnManager = turnManager ?? throw new ArgumentNullException(nameof(turnManager));
@@ -75,6 +78,7 @@ public class ThinkingChatClient : DelegatingChatClient
         _contextInjector = contextInjector;
         _meter = meter;
         _modifierRegistry = modifierRegistry ?? (_options.EnableReasoning ? ReasoningRequestModifierRegistry.Default : null);
+        _tokenCounter = tokenCounter;
     }
 
     /// <inheritdoc />
@@ -97,10 +101,29 @@ public class ThinkingChatClient : DelegatingChatClient
         // Create thinking context from messages and options
         var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
 
+        // Wrap sendRequest to auto-cap MaxOutputTokens and disable reasoning on continuation
+        var isInitialRequest = true;
+        ChatOptions? continuationOptions = null;
+
         // Process through turn manager
         var turnResult = await _turnManager.ProcessTurnAsync(
             context,
-            async (msgs, ct) => await base.GetResponseAsync(msgs, modifiedOptions, ct));
+            async (msgs, ct) =>
+            {
+                var opts = modifiedOptions;
+                if (!isInitialRequest)
+                {
+                    // Continuation requests: disable reasoning to prevent thinking leak
+                    continuationOptions ??= CreateContinuationOptions(modifiedOptions);
+                    opts = continuationOptions;
+                }
+                isInitialRequest = false;
+
+                // Auto-cap MaxOutputTokens to fit within context window (heuristic)
+                opts = CapMaxOutputTokens(opts, msgs);
+
+                return await base.GetResponseAsync(msgs, opts, ct);
+            });
 
         // Track conversation if enabled
         TrackConversation(sessionId, messageList, turnResult.Response);
@@ -369,6 +392,68 @@ public class ThinkingChatClient : DelegatingChatClient
         }
 
         return _options.SessionIdFactory();
+    }
+
+    /// <summary>
+    /// Caps MaxOutputTokens so that input + output fits within MaxContextTokens.
+    /// Prevents HTTP 400 errors when the requested max_tokens exceeds available space.
+    /// </summary>
+    private ChatOptions? CapMaxOutputTokens(ChatOptions? options, IList<ChatMessage> messages)
+    {
+        if (_tokenCounter is null || options?.MaxOutputTokens is null or <= 0)
+        {
+            return options;
+        }
+
+        var maxContext = _options.DefaultContinuation.MaxContextTokens;
+        if (maxContext is null or <= 0)
+        {
+            return options;
+        }
+
+        var inputTokens = 0;
+        foreach (var msg in messages)
+        {
+            inputTokens += _tokenCounter.Count(msg);
+        }
+
+        // Light safety margin for approximate token counting.
+        // If this still exceeds the limit, catch-and-retry handles it.
+        var safeInputTokens = (int)(inputTokens * 1.15);
+        const int buffer = 128;
+        var available = maxContext.Value - safeInputTokens - buffer;
+
+        if (available <= 0 || options.MaxOutputTokens.Value <= available)
+        {
+            return options;
+        }
+
+        // Clone and cap
+        var capped = options.Clone();
+        capped.MaxOutputTokens = available;
+        return capped;
+    }
+
+    /// <summary>
+    /// Creates options for continuation requests with reasoning flags removed.
+    /// Thinking models leak reasoning into continuation responses when
+    /// enable_thinking/include_reasoning is active.
+    /// </summary>
+    private static ChatOptions? CreateContinuationOptions(ChatOptions? options)
+    {
+        if (options is null)
+        {
+            return null;
+        }
+
+        var clone = options.Clone();
+        if (clone.AdditionalProperties is not null)
+        {
+            clone.AdditionalProperties.Remove("enable_thinking");
+            clone.AdditionalProperties.Remove("include_reasoning");
+        }
+
+        return clone;
     }
 
     /// <summary>
