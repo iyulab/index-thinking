@@ -163,15 +163,21 @@ public static class ContentRecoveryUtils
 
             if (!isFirst)
             {
-                // Check if we need a separator
-                if (!builder.ToString().EndsWith('\n') && !fragment.StartsWith('\n'))
+                // Ensure fragments are separated by a double newline for clean
+                // paragraph breaks. Truncated responses rarely end with newlines,
+                // so without this the next fragment (often a markdown heading)
+                // gets concatenated onto the previous line.
+                var endsWithNewline = builder.Length > 0 && builder[^1] == '\n';
+                var startsWithNewline = fragment.StartsWith('\n');
+
+                if (!endsWithNewline && !startsWithNewline)
                 {
-                    // Don't add separator if previous ends with punctuation
-                    var lastChar = builder[^1];
-                    if (!char.IsPunctuation(lastChar) && !char.IsWhiteSpace(lastChar))
-                    {
-                        builder.Append(' ');
-                    }
+                    builder.Append("\n\n");
+                }
+                else if (endsWithNewline && !startsWithNewline)
+                {
+                    // Single trailing newline — add one more for paragraph break
+                    builder.Append('\n');
                 }
             }
 

@@ -339,7 +339,7 @@ public class ContentRecoveryUtilsTests
         var result = ContentRecoveryUtils.CombineFragments(fragments);
 
         // Assert
-        result.Should().Be("First part second part");
+        result.Should().Be("First part\n\nsecond part");
     }
 
     [Fact]
@@ -352,7 +352,7 @@ public class ContentRecoveryUtilsTests
         var result = ContentRecoveryUtils.CombineFragments(fragments);
 
         // Assert
-        result.Should().Be("First part\nSecond part");
+        result.Should().Be("First part\n\nSecond part");
     }
 
     [Fact]
@@ -365,7 +365,7 @@ public class ContentRecoveryUtilsTests
         var result = ContentRecoveryUtils.CombineFragments(fragments);
 
         // Assert
-        result.Should().Be("First sentence.Second sentence.");
+        result.Should().Be("First sentence.\n\nSecond sentence.");
     }
 
     [Fact]
@@ -378,7 +378,7 @@ public class ContentRecoveryUtilsTests
         var result = ContentRecoveryUtils.CombineFragments(fragments);
 
         // Assert
-        result.Should().Be("First Second");
+        result.Should().Be("First\n\nSecond");
     }
 
     [Fact]

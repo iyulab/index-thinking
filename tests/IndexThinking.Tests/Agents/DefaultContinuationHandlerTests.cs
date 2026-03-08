@@ -301,9 +301,9 @@ public class DefaultContinuationHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_MaxContextTokensExceeded_StopsContinuation()
+    public async Task HandleAsync_MaxContextTokensExceeded_TriesCompactThenStops()
     {
-        // Arrange: set MaxContextTokens very low so continuation would exceed it
+        // Arrange: set MaxContextTokens very low so even compact messages exceed it
         var context = CreateContext(maxContextTokens: 50);
         var response = CreateResponseWithUsage("Truncated response with many tokens", promptTokens: 40);
 
@@ -311,16 +311,18 @@ public class DefaultContinuationHandlerTests
             .Detect(Arg.Any<ChatResponse>())
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
-        // Token counter returns values that would push over the limit
-        // promptTokenBaseline (40) + assistant response tokens (30) + continuation prompt tokens (20) = 90 > 50
+        // Token counter returns values that push over even for compact messages
+        // Full estimate: promptTokenBaseline (40) + 30 + 30 = 100 > 50 → triggers compact
+        // Compact estimate: each ChatMessage = 30 tokens, 2-3 messages → 60-90 > 50 → stops
         _tokenCounter.Count(Arg.Any<string>()).Returns(30);
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(30);
 
         var sendRequest = CreateSendRequestSubstitute(CreateResponse("More content"));
 
         // Act
         var result = await _handler.HandleAsync(context, response, sendRequest);
 
-        // Assert - should stop before sending any continuation (budget exceeded)
+        // Assert - compact messages also exceed budget, so stops
         Assert.Equal(0, result.ContinuationCount);
         Assert.False(result.ReachedMaxContinuations);
     }
@@ -366,15 +368,17 @@ public class DefaultContinuationHandlerTests
             .Detect(Arg.Any<ChatResponse>())
             .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
 
-        // Each message estimates to 15 tokens, 3 messages total = 45 > 30
-        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(15);
+        // Each message estimates to 20 tokens — both full and compact exceed budget
+        // Full: 3 messages × 20 = 60 > 30 → triggers compact
+        // Compact: 2 messages × 20 = 40 > 30 → stops
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(20);
 
         var sendRequest = CreateSendRequestSubstitute(CreateResponse("More"));
 
         // Act
         var result = await _handler.HandleAsync(context, response, sendRequest);
 
-        // Assert - should stop before sending (fallback estimation exceeds budget)
+        // Assert - even compact estimation exceeds budget, should stop
         Assert.Equal(0, result.ContinuationCount);
     }
 
