@@ -73,6 +73,19 @@ public sealed record ContinuationConfig
     public int MinProgressPerContinuation { get; init; } = 10;
 
     /// <summary>
+    /// Maximum context tokens allowed for continuation requests.
+    /// When set, the handler estimates token count before sending continuation
+    /// and stops if the total would exceed this limit.
+    /// Default: null (no context token validation)
+    /// </summary>
+    /// <remarks>
+    /// Set this to the model's context window size (or slightly below) to prevent
+    /// 400 Bad Request errors when continuation messages exceed the model's capacity.
+    /// When null, continuation requests are sent without token budget validation.
+    /// </remarks>
+    public int? MaxContextTokens { get; init; }
+
+    /// <summary>
     /// Whether to throw when max continuations is reached without completing.
     /// Default: false (returns partial response instead)
     /// </summary>
@@ -97,6 +110,11 @@ public sealed record ContinuationConfig
         if (MinProgressPerContinuation < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(MinProgressPerContinuation), "Must be non-negative");
+        }
+
+        if (MaxContextTokens is < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(MaxContextTokens), "Must be positive when set");
         }
     }
 }

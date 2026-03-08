@@ -11,12 +11,17 @@ namespace IndexThinking.Tests.Agents;
 public class DefaultContinuationHandlerTests
 {
     private readonly ITruncationDetector _truncationDetector;
+    private readonly ITokenCounter _tokenCounter;
     private readonly DefaultContinuationHandler _handler;
 
     public DefaultContinuationHandlerTests()
     {
         _truncationDetector = Substitute.For<ITruncationDetector>();
-        _handler = new DefaultContinuationHandler(_truncationDetector);
+        _tokenCounter = Substitute.For<ITokenCounter>();
+        // Default: each message ~10 tokens, each string ~5 tokens
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(10);
+        _tokenCounter.Count(Arg.Any<string>()).Returns(5);
+        _handler = new DefaultContinuationHandler(_truncationDetector, _tokenCounter);
     }
 
     [Fact]
@@ -193,7 +198,16 @@ public class DefaultContinuationHandlerTests
     public void Constructor_NullTruncationDetector_Throws()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => new DefaultContinuationHandler(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            new DefaultContinuationHandler(null!, _tokenCounter));
+    }
+
+    [Fact]
+    public void Constructor_NullTokenCounter_Throws()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() =>
+            new DefaultContinuationHandler(_truncationDetector, null!));
     }
 
     [Fact]
@@ -246,31 +260,6 @@ public class DefaultContinuationHandlerTests
         Assert.Empty(result.IntermediateResponses);
     }
 
-    private static ThinkingContext CreateContext(int maxContinuations = 5, bool throwOnMax = false)
-    {
-        return ThinkingContext.Create("test-session", [new ChatMessage(ChatRole.User, "Test")])
-            with
-            {
-                Continuation = new ContinuationConfig
-                {
-                    MaxContinuations = maxContinuations,
-                    ThrowOnMaxContinuations = throwOnMax,
-                    MinProgressPerContinuation = 10
-                }
-            };
-    }
-
-    private static ChatResponse CreateResponse(string text)
-    {
-        var message = new ChatMessage(ChatRole.Assistant, text);
-        return new ChatResponse([message]);
-    }
-
-    private static Task<ChatResponse> MockSendRequest(IList<ChatMessage> messages, CancellationToken ct)
-    {
-        return Task.FromResult(CreateResponse("Mock response"));
-    }
-
     [Fact]
     public async Task HandleAsync_TruncatedWithThinkTags_StripsTagsFromContinuationContext()
     {
@@ -309,6 +298,229 @@ public class DefaultContinuationHandlerTests
         Assert.DoesNotContain("<think>", assistantMessage!.Text);
         Assert.DoesNotContain("</think>", assistantMessage.Text);
         Assert.Contains("First part of answer", assistantMessage.Text);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MaxContextTokensExceeded_StopsContinuation()
+    {
+        // Arrange: set MaxContextTokens very low so continuation would exceed it
+        var context = CreateContext(maxContextTokens: 50);
+        var response = CreateResponseWithUsage("Truncated response with many tokens", promptTokens: 40);
+
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
+
+        // Token counter returns values that would push over the limit
+        // promptTokenBaseline (40) + assistant response tokens (30) + continuation prompt tokens (20) = 90 > 50
+        _tokenCounter.Count(Arg.Any<string>()).Returns(30);
+
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("More content"));
+
+        // Act
+        var result = await _handler.HandleAsync(context, response, sendRequest);
+
+        // Assert - should stop before sending any continuation (budget exceeded)
+        Assert.Equal(0, result.ContinuationCount);
+        Assert.False(result.ReachedMaxContinuations);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MaxContextTokensNotSet_ContinuesNormally()
+    {
+        // Arrange: MaxContextTokens is null (default) - should not block continuation
+        var context = CreateContext(); // no MaxContextTokens set
+        var initialResponse = CreateResponse("First part truncated");
+        var continuationResponse = CreateResponse("Second part complete");
+
+        var callCount = 0;
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
+
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(continuationResponse));
+
+        // Act
+        var result = await _handler.HandleAsync(context, initialResponse, sendRequest);
+
+        // Assert - continuation proceeds normally
+        Assert.Equal(1, result.ContinuationCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MaxContextTokensWithFallbackEstimation_StopsWhenExceeded()
+    {
+        // Arrange: no usage data on response, so falls back to ITokenCounter estimation
+        var context = CreateContext(maxContextTokens: 30);
+        var response = CreateResponse("Truncated");
+
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
+
+        // Each message estimates to 15 tokens, 3 messages total = 45 > 30
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(15);
+
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("More"));
+
+        // Act
+        var result = await _handler.HandleAsync(context, response, sendRequest);
+
+        // Assert - should stop before sending (fallback estimation exceeds budget)
+        Assert.Equal(0, result.ContinuationCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_MaxTotalDurationExceeded_StopsContinuation()
+    {
+        // Arrange: set MaxTotalDuration to zero so it immediately expires
+        var config = new ContinuationConfig
+        {
+            MaxContinuations = 5,
+            MaxTotalDuration = TimeSpan.Zero,
+            MinProgressPerContinuation = 10
+        };
+        var context = ThinkingContext.Create("test-session", [new ChatMessage(ChatRole.User, "Test")])
+            with { Continuation = config };
+
+        var response = CreateResponse("Truncated content that is long enough");
+
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit));
+
+        var sendRequest = CreateSendRequestSubstitute(CreateResponse("More content here"));
+
+        // Act
+        var result = await _handler.HandleAsync(context, response, sendRequest);
+
+        // Assert - should stop immediately due to duration exceeded
+        Assert.Equal(0, result.ContinuationCount);
+    }
+
+    [Fact]
+    public void ContinuationConfig_MaxContextTokens_ValidationRejectsZero()
+    {
+        // Arrange
+        var config = new ContinuationConfig { MaxContextTokens = 0 };
+
+        // Act & Assert
+        Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+    }
+
+    [Fact]
+    public void ContinuationConfig_MaxContextTokens_ValidationRejectsNegative()
+    {
+        // Arrange
+        var config = new ContinuationConfig { MaxContextTokens = -1 };
+
+        // Act & Assert
+        Assert.Throws<ArgumentOutOfRangeException>(() => config.Validate());
+    }
+
+    [Fact]
+    public void ContinuationConfig_MaxContextTokens_ValidationAcceptsNull()
+    {
+        // Arrange
+        var config = new ContinuationConfig { MaxContextTokens = null };
+
+        // Act & Assert (should not throw)
+        config.Validate();
+    }
+
+    [Fact]
+    public void ContinuationConfig_MaxContextTokens_ValidationAcceptsPositive()
+    {
+        // Arrange
+        var config = new ContinuationConfig { MaxContextTokens = 4096 };
+
+        // Act & Assert (should not throw)
+        config.Validate();
+    }
+
+    [Fact]
+    public async Task HandleAsync_UsesPromptTokenBaselineWhenAvailable()
+    {
+        // Arrange: response has usage with prompt_tokens
+        var context = CreateContext(maxContextTokens: 100);
+        var response = CreateResponseWithUsage("First part truncated", promptTokens: 60);
+        var continuationResponse = CreateResponse("Second part");
+
+        // First call truncated, second not
+        var callCount = 0;
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                callCount++;
+                return callCount == 1
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
+
+        // With promptTokenBaseline=60, assistant text tokens=15, continuation prompt tokens=15
+        // Total = 60 + 15 + 15 = 90 < 100, so continuation should proceed
+        _tokenCounter.Count(Arg.Any<string>()).Returns(15);
+
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(continuationResponse));
+
+        // Act
+        var result = await _handler.HandleAsync(context, response, sendRequest);
+
+        // Assert - continuation proceeds because within budget
+        Assert.Equal(1, result.ContinuationCount);
+    }
+
+    private static ThinkingContext CreateContext(
+        int maxContinuations = 5,
+        bool throwOnMax = false,
+        int? maxContextTokens = null)
+    {
+        return ThinkingContext.Create("test-session", [new ChatMessage(ChatRole.User, "Test")])
+            with
+            {
+                Continuation = new ContinuationConfig
+                {
+                    MaxContinuations = maxContinuations,
+                    ThrowOnMaxContinuations = throwOnMax,
+                    MinProgressPerContinuation = 10,
+                    MaxContextTokens = maxContextTokens
+                }
+            };
+    }
+
+    private static ChatResponse CreateResponse(string text)
+    {
+        var message = new ChatMessage(ChatRole.Assistant, text);
+        return new ChatResponse([message]);
+    }
+
+    private static ChatResponse CreateResponseWithUsage(string text, int promptTokens)
+    {
+        var message = new ChatMessage(ChatRole.Assistant, text);
+        return new ChatResponse([message])
+        {
+            Usage = new UsageDetails
+            {
+                InputTokenCount = promptTokens,
+                OutputTokenCount = text.Length / 4
+            }
+        };
+    }
+
+    private static Task<ChatResponse> MockSendRequest(IList<ChatMessage> messages, CancellationToken ct)
+    {
+        return Task.FromResult(CreateResponse("Mock response"));
     }
 
     private static Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>> CreateSendRequestSubstitute(

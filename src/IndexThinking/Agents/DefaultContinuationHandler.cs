@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using IndexThinking.Abstractions;
 using IndexThinking.Continuation;
 using IndexThinking.Parsers;
@@ -11,21 +12,25 @@ namespace IndexThinking.Agents;
 /// <remarks>
 /// Uses state machine pattern:
 /// 1. Detect truncation via ITruncationDetector
-/// 2. Apply content recovery if needed
-/// 3. Build continuation request with previous response
-/// 4. Track progress to prevent infinite loops
+/// 2. Validate context token budget before continuation
+/// 3. Apply content recovery if needed
+/// 4. Build continuation request with previous response
+/// 5. Track progress to prevent infinite loops
 /// </remarks>
 public sealed class DefaultContinuationHandler : IContinuationHandler
 {
     private readonly ITruncationDetector _truncationDetector;
+    private readonly ITokenCounter _tokenCounter;
 
     /// <summary>
     /// Creates a new continuation handler.
     /// </summary>
     /// <param name="truncationDetector">Detector for response truncation.</param>
-    public DefaultContinuationHandler(ITruncationDetector truncationDetector)
+    /// <param name="tokenCounter">Token counter for context budget validation.</param>
+    public DefaultContinuationHandler(ITruncationDetector truncationDetector, ITokenCounter tokenCounter)
     {
         _truncationDetector = truncationDetector ?? throw new ArgumentNullException(nameof(truncationDetector));
+        _tokenCounter = tokenCounter ?? throw new ArgumentNullException(nameof(tokenCounter));
     }
 
     /// <inheritdoc />
@@ -47,10 +52,14 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             return ContinuationResult.NotTruncated(initialResponse);
         }
 
+        // Capture prompt token baseline from initial response usage (more accurate than estimation)
+        var promptTokenBaseline = (int?)(initialResponse.Usage?.InputTokenCount);
+
         var intermediateResponses = new List<ChatResponse> { initialResponse };
         var fragments = new List<string>();
         var continuationCount = 0;
         var currentResponse = initialResponse;
+        var elapsed = Stopwatch.StartNew();
 
         // Collect initial fragment (strip think tags per-fragment so combined text is clean)
         var initialText = GetResponseText(initialResponse);
@@ -63,6 +72,12 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         while (continuationCount < config.MaxContinuations)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
+
+            // Enforce MaxTotalDuration
+            if (elapsed.Elapsed >= config.MaxTotalDuration)
+            {
+                break;
+            }
 
             // Check for progress
             var lastFragmentLength = fragments.Count > 0 ? fragments[^1].Length : 0;
@@ -79,6 +94,18 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
 
             // Build continuation messages
             var continuationMessages = BuildContinuationMessages(context, currentResponse, config);
+
+            // Validate context token budget before sending
+            if (config.MaxContextTokens is > 0)
+            {
+                var estimatedTokens = EstimateContinuationTokens(
+                    continuationMessages, promptTokenBaseline, currentResponse);
+
+                if (estimatedTokens > config.MaxContextTokens.Value)
+                {
+                    break;
+                }
+            }
 
             // Send continuation request
             var nextResponse = await sendRequest(continuationMessages, context.CancellationToken);
@@ -125,6 +152,44 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             ReachedMaxContinuations = reachedMax,
             IntermediateResponses = intermediateResponses
         };
+    }
+
+    /// <summary>
+    /// Estimates the total token count for a continuation request.
+    /// Prefers the initial response's prompt_tokens as baseline when available,
+    /// since it reflects the actual tokenization the model performed.
+    /// </summary>
+    private int EstimateContinuationTokens(
+        IList<ChatMessage> continuationMessages,
+        int? promptTokenBaseline,
+        ChatResponse currentResponse)
+    {
+        if (promptTokenBaseline.HasValue)
+        {
+            // Use actual prompt_tokens from initial request as baseline for original messages,
+            // then estimate only the added messages (assistant response + continuation prompt)
+            var additionalTokens = 0;
+            var previousText = GetResponseText(currentResponse);
+            if (!string.IsNullOrEmpty(previousText))
+            {
+                previousText = OpenSourceReasoningParser.StripThinkTags(previousText);
+                additionalTokens += _tokenCounter.Count(previousText);
+            }
+
+            // Continuation prompt tokens
+            additionalTokens += _tokenCounter.Count(
+                continuationMessages[^1].Text ?? string.Empty);
+
+            return promptTokenBaseline.Value + additionalTokens;
+        }
+
+        // Fallback: estimate all messages
+        var total = 0;
+        foreach (var message in continuationMessages)
+        {
+            total += _tokenCounter.Count(message);
+        }
+        return total;
     }
 
     private static List<ChatMessage> BuildContinuationMessages(
