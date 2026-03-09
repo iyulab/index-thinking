@@ -447,9 +447,23 @@ public class ThinkingChatClient : DelegatingChatClient
             return options;
         }
 
-        var boosted = options.Clone();
-        boosted.MaxOutputTokens = options.MaxOutputTokens.Value * _options.ThinkingOutputMultiplier;
-        return boosted;
+        var boosted = options.MaxOutputTokens.Value * _options.ThinkingOutputMultiplier;
+
+        // Hard cap: never exceed half the context window (the other half is for input)
+        var maxContext = _options.DefaultContinuation.MaxContextTokens;
+        if (maxContext is > 0)
+        {
+            boosted = Math.Min(boosted, maxContext.Value / 2);
+        }
+
+        if (boosted <= options.MaxOutputTokens.Value)
+        {
+            return options; // boost would not increase, skip clone
+        }
+
+        var cloned = options.Clone();
+        cloned.MaxOutputTokens = boosted;
+        return cloned;
     }
 
     /// <summary>

@@ -522,6 +522,19 @@ public class OpenSourceReasoningParserTests
         result.Should().Be(content);
     }
 
+    [Fact]
+    public void StripUntaggedReasoning_SoWithComma_Strips()
+    {
+        var content = new string('가', 300);
+        var reasoning = "\n\nSo, the continuation would be to modify section 6. " +
+            new string('x', 300);
+        var input = content + reasoning;
+
+        var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
+
+        result.Should().Be(content);
+    }
+
     #endregion
 
     #region HasReasoningContent Tests
@@ -657,6 +670,111 @@ public class OpenSourceReasoningParserTests
         {
             RawRepresentation = rawElement
         };
+    }
+
+    #endregion
+
+    #region StripTrailingByScriptShift Tests
+
+    [Fact]
+    public void StripTrailingByScriptShift_KoreanContentWithEnglishReasoning_StripsReasoning()
+    {
+        // Build CJK-dominant text (~800 chars) followed by English reasoning (~300 chars)
+        var korean = new StringBuilder();
+        korean.AppendLine("### 1. 핵심 주제");
+        korean.AppendLine("이 설교는 하나님의 사랑과 은혜에 대한 메시지입니다.");
+        korean.AppendLine();
+        korean.AppendLine("### 2. 주요 성경 구절");
+        korean.AppendLine("요한복음 3장 16절에서 하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니");
+        korean.AppendLine();
+        korean.AppendLine("### 3. 핵심 메시지");
+        korean.AppendLine("하나님의 사랑은 조건 없는 것이며 우리 모두에게 주어진 선물입니다.");
+        korean.AppendLine("이 사랑은 어떤 상황에서도 변하지 않는 영원한 사랑입니다.");
+        korean.AppendLine();
+        korean.AppendLine("### 4. 적용 및 실천");
+        korean.AppendLine("우리는 이 사랑을 받아들이고 다른 사람들에게도 전해야 합니다.");
+        korean.AppendLine("매일의 삶에서 하나님의 사랑을 실천하는 것이 중요합니다.");
+        korean.AppendLine();
+        korean.AppendLine("### 5. 결론 및 축복");
+        korean.AppendLine("하나님의 사랑 안에서 평안과 기쁨을 누리시기를 축복합니다.");
+        korean.AppendLine("이 메시지가 여러분의 삶에 큰 힘이 되기를 바랍니다.");
+
+        var reasoning = new StringBuilder();
+        reasoning.AppendLine();
+        reasoning.AppendLine("Okay, so the user wanted me to summarize this sermon into 5 sections. " +
+            "I've covered the main themes from the transcript. Let me verify that each section " +
+            "accurately reflects the content. The first section introduces the core topic of God's love. " +
+            "The second section references John 3:16 which was the primary verse discussed. " +
+            "I think this covers everything the user requested in their prompt.");
+
+        var text = korean.ToString() + reasoning.ToString();
+        var result = OpenSourceReasoningParser.StripTrailingByScriptShift(text);
+
+        result.Should().NotContain("Okay, so the user");
+        result.Should().Contain("### 5. 결론 및 축복");
+        result.Should().Contain("큰 힘이 되기를 바랍니다");
+    }
+
+    [Fact]
+    public void StripTrailingByScriptShift_PureKoreanText_NoChange()
+    {
+        var korean = new StringBuilder();
+        for (var i = 0; i < 20; i++)
+            korean.AppendLine("하나님의 사랑은 영원하며 우리 모두에게 주어진 선물입니다. 이 사랑을 전하세요.");
+
+        var text = korean.ToString();
+        var result = OpenSourceReasoningParser.StripTrailingByScriptShift(text);
+
+        result.Should().Be(text);
+    }
+
+    [Fact]
+    public void StripTrailingByScriptShift_PureEnglishText_NoChange()
+    {
+        var english = new StringBuilder();
+        for (var i = 0; i < 20; i++)
+            english.AppendLine("This is a completely English text with no CJK characters at all.");
+
+        var text = english.ToString();
+        var result = OpenSourceReasoningParser.StripTrailingByScriptShift(text);
+
+        result.Should().Be(text);
+    }
+
+    [Fact]
+    public void StripTrailingByScriptShift_ShortText_NoChange()
+    {
+        var text = "짧은 한국어 텍스트\n\nShort trailing English.";
+        var result = OpenSourceReasoningParser.StripTrailingByScriptShift(text);
+
+        result.Should().Be(text);
+    }
+
+    [Fact]
+    public void StripTrailingByScriptShift_EnglishTermsInKorean_NoFalsePositive()
+    {
+        // Korean text with English technical terms mixed in should NOT be stripped
+        var korean = new StringBuilder();
+        korean.AppendLine("### 1. 핵심 주제");
+        korean.AppendLine("이 설교는 하나님의 love와 grace에 대한 메시지입니다.");
+        korean.AppendLine();
+        korean.AppendLine("### 2. 성경 구절");
+        korean.AppendLine("John 3:16 요한복음에서 하나님이 세상을 사랑하사 독생자를 주셨으니");
+        korean.AppendLine();
+        korean.AppendLine("### 3. 핵심 메시지와 Application");
+        korean.AppendLine("하나님의 사랑은 unconditional한 것이며 우리 모두에게 주어진 gift입니다.");
+        korean.AppendLine("매일의 삶에서 practice하는 것이 중요합니다.");
+        korean.AppendLine();
+        korean.AppendLine("### 4. 결론");
+        korean.AppendLine("하나님의 사랑 안에서 peace와 joy를 누리시기를 축복합니다.");
+        // Pad to meet minimum length
+        for (var i = 0; i < 5; i++)
+            korean.AppendLine("이 메시지가 여러분의 삶에 큰 힘이 되기를 바라며 축복합니다.");
+
+        var text = korean.ToString();
+        var result = OpenSourceReasoningParser.StripTrailingByScriptShift(text);
+
+        result.Should().Be(text);
     }
 
     #endregion

@@ -154,7 +154,7 @@ public class ThinkingChatClientOptions
     /// sends max_tokens=12288, giving the model room for both thinking and content output.
     /// The result is still capped by <see cref="ContinuationConfig.MaxContextTokens"/> via
     /// <see cref="ThinkingChatClient.CapMaxOutputTokens"/>.
-    /// Default: 3. Set to 1 to disable boosting.
+    /// Default: 2. Set to 1 to disable boosting.
     /// </summary>
-    public int ThinkingOutputMultiplier { get; set; } = 3;
+    public int ThinkingOutputMultiplier { get; set; } = 2;
 }

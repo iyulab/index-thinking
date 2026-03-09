@@ -182,9 +182,17 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         // Combine fragments
         var combinedText = CombineFragments(fragments, config);
 
+        // Strip leading text that switches from Latin to CJK script
+        // (thinking models may leak English reasoning before CJK content)
+        combinedText = OpenSourceReasoningParser.StripLeadingByScriptShift(combinedText);
+
         // Strip trailing untagged reasoning (continuation artifacts where the model
         // responds with inline reasoning instead of actual content)
         combinedText = OpenSourceReasoningParser.StripUntaggedReasoning(combinedText);
+
+        // Strip trailing text that switches from CJK to Latin script
+        // (thinking models may leak English reasoning after CJK content)
+        combinedText = OpenSourceReasoningParser.StripTrailingByScriptShift(combinedText);
 
         // Apply content recovery
         combinedText = ApplyRecovery(combinedText, config);

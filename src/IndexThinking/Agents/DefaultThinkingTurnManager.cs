@@ -137,7 +137,9 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
                 {
                     var stripped = OpenSourceReasoningParser.StripThinkTags(textContent.Text);
                     stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
+                    stripped = OpenSourceReasoningParser.StripLeadingByScriptShift(stripped);
                     stripped = OpenSourceReasoningParser.StripUntaggedReasoning(stripped);
+                    stripped = OpenSourceReasoningParser.StripTrailingByScriptShift(stripped);
                     if (stripped != textContent.Text)
                     {
                         message.Contents[i] = new TextContent(stripped);

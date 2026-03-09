@@ -43,12 +43,12 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     // reasoning starters. Thinking models sometimes output inline reasoning after
     // structured content, especially in continuation responses where enable_thinking
     // is disabled or absent.
-    [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
+    [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So,? (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
     private static partial Regex UntaggedReasoningRegex();
 
     // Detects reasoning starters at the beginning of text (no blank-line prefix required).
     // Used for leading reasoning detection in continuation fragments.
-    [GeneratedRegex(@"^(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b")]
+    [GeneratedRegex(@"^(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So,? (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b")]
     private static partial Regex LeadingReasoningStarterRegex();
 
     private readonly DeepSeekThinkingConfig _config;
@@ -628,6 +628,182 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
 
         return 0;
     }
+
+    /// <summary>
+    /// Strips leading text that exhibits a Unicode script shift from Latin to CJK.
+    /// When the main content is CJK-dominant (Korean, Chinese, Japanese) but leading
+    /// paragraphs are Latin-dominant, this is typically untagged reasoning from thinking
+    /// models that reason in English before producing CJK output. Only applies when
+    /// the second half of the text is CJK-dominant (&gt;10% CJK letters) and the
+    /// leading Latin block is at least 150 chars.
+    /// </summary>
+    /// <param name="text">The text potentially containing leading Latin reasoning.</param>
+    /// <returns>The text with leading script-shifted reasoning removed.</returns>
+    public static string StripLeadingByScriptShift(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length < 700)
+            return text;
+
+        // The second half of the text must be CJK-dominant
+        var halfLen = text.Length / 2;
+        if (CjkRatio(text.AsSpan(halfLen)) < 0.10)
+            return text;
+
+        // Scan forward through paragraph boundaries. At each blank line, check if
+        // the NEXT paragraph is CJK-dominant (>50% CJK). Reasoning text in English
+        // may contain quoted CJK words (e.g. Korean terms from source text), so we
+        // check each paragraph individually rather than cumulative ratios.
+        var searchFrom = 0;
+
+        while (true)
+        {
+            var blankLine = FirstBlankLine(text, searchFrom);
+            if (blankLine < 0 || blankLine > text.Length - 300)
+                break;
+
+            // Must have at least 150 chars of leading text
+            if (blankLine < 150)
+            {
+                searchFrom = blankLine + 2;
+                if (searchFrom >= text.Length) break;
+                continue;
+            }
+
+            // Find the start of the next paragraph (skip whitespace after blank line)
+            var nextStart = blankLine;
+            while (nextStart < text.Length && char.IsWhiteSpace(text[nextStart]))
+                nextStart++;
+
+            if (nextStart >= text.Length)
+                break;
+
+            // Find the end of the next paragraph
+            var nextBlank = FirstBlankLine(text, nextStart);
+            var nextEnd = nextBlank >= 0 ? nextBlank : text.Length;
+
+            var nextPara = text.AsSpan(nextStart, nextEnd - nextStart);
+            if (nextPara.Length >= 20 && CjkRatio(nextPara) > 0.50)
+            {
+                // Found a CJK-dominant paragraph — cut everything before it
+                return text[nextStart..];
+            }
+
+            searchFrom = blankLine + 2;
+            if (searchFrom >= text.Length) break;
+        }
+
+        return text;
+    }
+
+    /// <summary>
+    /// Strips trailing text that exhibits a Unicode script shift from CJK to Latin.
+    /// When the main content is CJK-dominant (Korean, Chinese, Japanese) and trailing
+    /// paragraphs switch to Latin-dominant text, this is typically untagged reasoning
+    /// from thinking models. Only applies when the first half of the text is CJK-dominant
+    /// (&gt;10% CJK letters) and the trailing Latin block is at least 150 chars.
+    /// </summary>
+    /// <param name="text">The text potentially containing trailing Latin reasoning.</param>
+    /// <returns>The text with trailing script-shifted reasoning removed.</returns>
+    public static string StripTrailingByScriptShift(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length < 700)
+            return text;
+
+        // The first half of the text must be CJK-dominant
+        var halfLen = text.Length / 2;
+        if (CjkRatio(text.AsSpan(0, halfLen)) < 0.10)
+            return text;
+
+        // Scan backwards from the end to find where CJK content stops
+        // and Latin-only trailing text begins (at blank-line boundaries)
+        var cutAt = -1;
+        var searchEnd = text.Length;
+
+        while (true)
+        {
+            var blankLine = LastBlankLine(text, searchEnd);
+            if (blankLine < 0 || blankLine < 300)
+                break;
+
+            var trailingSpan = text.AsSpan(blankLine);
+            if (trailingSpan.Length < 150)
+                break;
+
+            if (CjkRatio(trailingSpan) < 0.05)
+            {
+                // Latin-dominant trailing block — candidate for cutting
+                cutAt = blankLine;
+                searchEnd = blankLine;
+            }
+            else
+            {
+                // Hit CJK content — stop scanning
+                break;
+            }
+        }
+
+        if (cutAt > 0)
+            return text[..cutAt].TrimEnd();
+
+        return text;
+    }
+
+    /// <summary>
+    /// Finds the first blank line (double newline) at or after the given position,
+    /// handling both Unix (\n\n) and Windows (\r\n\r\n) line endings.
+    /// </summary>
+    private static int FirstBlankLine(string text, int searchFrom)
+    {
+        if (searchFrom >= text.Length) return -1;
+        var unix = text.IndexOf("\n\n", searchFrom, StringComparison.Ordinal);
+        var windows = text.IndexOf("\r\n\r\n", searchFrom, StringComparison.Ordinal);
+        if (unix < 0) return windows;
+        if (windows < 0) return unix;
+        return Math.Min(unix, windows);
+    }
+
+    /// <summary>
+    /// Finds the last blank line (double newline) before the given position,
+    /// handling both Unix (\n\n) and Windows (\r\n\r\n) line endings.
+    /// </summary>
+    private static int LastBlankLine(string text, int searchEnd)
+    {
+        if (searchEnd <= 1) return -1;
+        var unix = text.LastIndexOf("\n\n", searchEnd - 1, StringComparison.Ordinal);
+        var windows = text.LastIndexOf("\r\n\r\n", searchEnd - 1, StringComparison.Ordinal);
+        return Math.Max(unix, windows);
+    }
+
+    /// <summary>
+    /// Calculates the ratio of CJK characters to total letter characters in the span.
+    /// Whitespace, punctuation, and digits are excluded from the count.
+    /// </summary>
+    internal static double CjkRatio(ReadOnlySpan<char> text)
+    {
+        if (text.Length == 0) return 0;
+
+        var cjk = 0;
+        var letters = 0;
+
+        foreach (var c in text)
+        {
+            if (char.IsWhiteSpace(c) || char.IsPunctuation(c) || char.IsDigit(c))
+                continue;
+            letters++;
+            if (IsCjk(c)) cjk++;
+        }
+
+        return letters > 0 ? (double)cjk / letters : 0;
+    }
+
+    private static bool IsCjk(char c) =>
+        c is (>= '\uAC00' and <= '\uD7A3')   // Korean Hangul Syllables
+          or (>= '\u3131' and <= '\u318E')   // Korean Compatibility Jamo
+          or (>= '\u1100' and <= '\u11FF')   // Korean Jamo
+          or (>= '\u4E00' and <= '\u9FFF')   // CJK Unified Ideographs
+          or (>= '\u3040' and <= '\u309F')   // Hiragana
+          or (>= '\u30A0' and <= '\u30FF')   // Katakana
+          or (>= '\uF900' and <= '\uFAFF');  // CJK Compatibility Ideographs
 
     private static string? GetStringValue(object value)
     {
