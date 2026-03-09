@@ -129,11 +129,15 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             continuationCount++;
             intermediateResponses.Add(nextResponse);
 
-            // Collect fragment (strip think tags per-fragment so combined text is clean)
+            // Collect fragment (strip think tags and leading reasoning per-fragment
+            // so combined text is clean). Continuation requests have enable_thinking=false,
+            // so models may output inline reasoning before actual content.
             var nextText = GetResponseText(nextResponse);
             if (!string.IsNullOrEmpty(nextText))
             {
-                fragments.Add(OpenSourceReasoningParser.StripThinkTags(nextText));
+                var stripped = OpenSourceReasoningParser.StripThinkTags(nextText);
+                stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
+                fragments.Add(stripped);
             }
 
             currentResponse = nextResponse;

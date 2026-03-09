@@ -46,6 +46,11 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
     private static partial Regex UntaggedReasoningRegex();
 
+    // Detects reasoning starters at the beginning of text (no blank-line prefix required).
+    // Used for leading reasoning detection in continuation fragments.
+    [GeneratedRegex(@"^(?:Okay|Wait|Let me|Looking|The user|However|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b")]
+    private static partial Regex LeadingReasoningStarterRegex();
+
     private readonly DeepSeekThinkingConfig _config;
 
     /// <summary>
@@ -282,6 +287,73 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
         }
 
         return text;
+    }
+
+    /// <summary>
+    /// Strips leading untagged reasoning from continuation fragments.
+    /// When enable_thinking is off during continuation, models may output inline
+    /// reasoning (e.g. "Okay, I need to continue...") before actual content.
+    /// Scans from the start, following consecutive reasoning paragraphs, and strips
+    /// the entire reasoning block when it contains at least 2 reasoning paragraphs.
+    /// </summary>
+    /// <param name="text">The text potentially containing leading reasoning.</param>
+    /// <returns>The text with leading reasoning removed.</returns>
+    public static string StripLeadingUntaggedReasoning(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var trimmed = text.TrimStart();
+        if (!LeadingReasoningStarterRegex().IsMatch(trimmed))
+        {
+            return text;
+        }
+
+        // Find the last blank-line boundary where a reasoning paragraph starts.
+        // The UntaggedReasoningRegex matches "\n\n" followed by a reasoning starter,
+        // so all matches are internal paragraph boundaries within the reasoning block.
+        var matches = UntaggedReasoningRegex().Matches(text);
+        if (matches.Count == 0)
+        {
+            // Only one reasoning paragraph (the leading one) — not enough signal
+            return text;
+        }
+
+        // We have the leading paragraph + at least 1 more reasoning paragraph
+        // (≥2 total). Find where the reasoning block ends: scan forward from
+        // the last reasoning-starter boundary to the next blank line.
+        var lastMatch = matches[^1];
+        var searchFrom = lastMatch.Index + lastMatch.Length;
+        var endOfReasoning = text.IndexOf("\n\n", searchFrom, StringComparison.Ordinal);
+
+        int contentStart;
+        if (endOfReasoning >= 0)
+        {
+            contentStart = endOfReasoning;
+            // Skip whitespace to reach actual content
+            while (contentStart < text.Length && char.IsWhiteSpace(text[contentStart]))
+                contentStart++;
+        }
+        else
+        {
+            // No blank line after last reasoning paragraph — everything is reasoning
+            return text;
+        }
+
+        if (contentStart >= text.Length)
+        {
+            return text;
+        }
+
+        // Verify the content after reasoning doesn't start with yet another reasoning pattern
+        if (LeadingReasoningStarterRegex().IsMatch(text[contentStart..]))
+        {
+            return text;
+        }
+
+        return text[contentStart..];
     }
 
     /// <summary>

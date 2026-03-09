@@ -367,6 +367,132 @@ public class OpenSourceReasoningParserTests
 
     #endregion
 
+    #region StripLeadingUntaggedReasoning Tests
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_NullInput_ReturnsInput()
+    {
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(null!);
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_NoReasoningPattern_ReturnsOriginal()
+    {
+        var input = "### 1. Topic\nContent here\n\n### 2. Details\nMore content";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().Be(input);
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_SingleReasoningParagraph_ReturnsOriginal()
+    {
+        // Only 1 reasoning paragraph is not enough signal to strip
+        var input = "Okay, I need to think about this.\n\n### 1. Topic\nContent here";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().Be(input);
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_MultipleReasoningParagraphs_StripsReasoning()
+    {
+        var input =
+            "Okay, I need to continue the response from where it was cut off. " +
+            "Let me check the previous part.\n\n" +
+            "The user provided a long sermon text, and the assistant had started " +
+            "summarizing it. The last part was cut off mid-sentence.\n\n" +
+            "So the next part should continue explaining the core arguments. " +
+            "Let me look at the original text to see what comes next.\n\n" +
+            "### 3. 핵심 논지 전개\n3. **신령인의 형성과 역할**:\ncontent here";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().StartWith("### 3.");
+        result.Should().Contain("신령인의 형성과 역할");
+        result.Should().NotContain("Okay, I need to continue");
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_ReasoningWithDraftContent_StripsEntireBlock()
+    {
+        // Reasoning block contains draft content (numbered items) between reasoning paragraphs
+        var input =
+            "Okay, I need to continue the response.\n\n" +
+            "Looking at the text, the speaker discusses several points.\n\n" +
+            "2. **내적 믿음**: 설명...\n" +
+            "3. **우상의 위험**: 설명...\n\n" +
+            "Wait, but the user's instruction says to continue directly.\n\n" +
+            "Let me check the original text again.\n\n" +
+            "### 3. 핵심 논지 전개\n3. **실제 내용**:\nactual content";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().StartWith("### 3.");
+        result.Should().Contain("실제 내용");
+        result.Should().NotContain("Okay, I need to continue");
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_AllReasoning_ReturnsOriginal()
+    {
+        // If everything is reasoning with no actual content after, don't strip
+        var input =
+            "Okay, I need to think about this.\n\n" +
+            "The user asked about something complex.\n\n" +
+            "Let me analyze this further.";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().Be(input);
+    }
+
+    [Fact]
+    public void StripLeadingUntaggedReasoning_ContentFollowedByReasoning_ReturnsOriginal()
+    {
+        // Content starts normally — this is the trailing case, not leading
+        var input = "### 1. Topic\nContent here\n\nOkay, let me think.\n\nThe user wants more.";
+
+        var result = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(input);
+
+        result.Should().Be(input);
+    }
+
+    #endregion
+
+    #region StripUntaggedReasoning Tests
+
+    [Fact]
+    public void StripUntaggedReasoning_TrailingReasoning_StripsWhenAfterOneThird()
+    {
+        // Valid content takes up >1/3, reasoning is trailing
+        var content = new string('가', 500); // ~500 chars of Korean content
+        var reasoning = "\n\nOkay, I need to think about this. " + new string('x', 300);
+        var input = content + reasoning;
+
+        var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
+
+        result.Should().Be(content);
+    }
+
+    [Fact]
+    public void StripUntaggedReasoning_EarlyReasoning_DoesNotStrip()
+    {
+        // Reasoning appears before 1/3 mark — not stripped (handled by StripLeadingUntaggedReasoning)
+        var content = "Short content here.";
+        var reasoning = "\n\nOkay, I need to think about this. " + new string('x', 1000);
+        var input = content + reasoning;
+
+        var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
+
+        result.Should().Be(input);
+    }
+
+    #endregion
+
     #region HasReasoningContent Tests
 
     [Fact]
