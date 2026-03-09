@@ -435,9 +435,10 @@ public class ThinkingChatClient : DelegatingChatClient
     }
 
     /// <summary>
-    /// Creates options for continuation requests with reasoning flags removed.
-    /// Thinking models leak reasoning into continuation responses when
-    /// enable_thinking/include_reasoning is active.
+    /// Creates options for continuation requests with reasoning explicitly disabled.
+    /// Simply removing flags causes some models (e.g. Qwen3) to fall back to their
+    /// default behavior (thinking enabled), leaking untagged reasoning into content.
+    /// Setting to <c>false</c> explicitly disables reasoning for the continuation.
     /// </summary>
     private static ChatOptions? CreateContinuationOptions(ChatOptions? options)
     {
@@ -449,8 +450,12 @@ public class ThinkingChatClient : DelegatingChatClient
         var clone = options.Clone();
         if (clone.AdditionalProperties is not null)
         {
-            clone.AdditionalProperties.Remove("enable_thinking");
-            clone.AdditionalProperties.Remove("include_reasoning");
+            // Explicitly disable rather than remove — absent flags may
+            // fall back to model default (often enabled for thinking models)
+            if (clone.AdditionalProperties.ContainsKey("enable_thinking"))
+                clone.AdditionalProperties["enable_thinking"] = false;
+            if (clone.AdditionalProperties.ContainsKey("include_reasoning"))
+                clone.AdditionalProperties["include_reasoning"] = false;
         }
 
         return clone;
