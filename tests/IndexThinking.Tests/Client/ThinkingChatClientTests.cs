@@ -5,6 +5,7 @@ using IndexThinking.Client;
 using IndexThinking.Context;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
+using IndexThinking.Continuation;
 using NSubstitute;
 using Xunit;
 
@@ -701,5 +702,149 @@ public class ThinkingChatClientOptionsContextTests
         options.MaxContextTurns.Should().Be(10);
         options.ContextTrackerOptions.MaxTurns.Should().Be(20);
         options.ContextInjectorOptions.MaxTurnsToInject.Should().Be(3);
+    }
+
+    [Fact]
+    public void MaxContextTokens_PropagatesToContinuationAndInjector()
+    {
+        var options = new ThinkingChatClientOptions
+        {
+            MaxContextTokens = 32000
+        };
+
+        options.DefaultContinuation.MaxContextTokens.Should().Be(32000);
+        options.ContextInjectorOptions.MaxContextTokens.Should().Be(32000);
+    }
+
+    [Fact]
+    public void MaxContextTokens_Default_IsNull()
+    {
+        var options = new ThinkingChatClientOptions();
+        options.MaxContextTokens.Should().BeNull();
+    }
+}
+
+public class ThinkingChatClientInputValidationTests : IDisposable
+{
+    private readonly IChatClient _innerClient;
+    private readonly IThinkingTurnManager _turnManager;
+    private readonly ITokenCounter _tokenCounter;
+
+    public ThinkingChatClientInputValidationTests()
+    {
+        _innerClient = Substitute.For<IChatClient>();
+        _turnManager = Substitute.For<IThinkingTurnManager>();
+        _tokenCounter = Substitute.For<ITokenCounter>();
+    }
+
+    public void Dispose()
+    {
+        GC.SuppressFinalize(this);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_InputExceedsContext_ThrowsContextWindowExceededException()
+    {
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(5000);
+        var options = new ThinkingChatClientOptions
+        {
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 },
+            EnableContextInjection = false
+        };
+        var client = new ThinkingChatClient(
+            _innerClient, _turnManager, options, tokenCounter: _tokenCounter);
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System, "System prompt"),
+            new(ChatRole.User, "Very long message")
+        };
+        // 2 * 5000 = 10000, * 1.15 = 11500 > 8000
+
+        var act = () => client.GetResponseAsync(messages);
+        await act.Should().ThrowAsync<ContextWindowExceededException>()
+            .Where(ex => ex.MaxContextTokens == 8000);
+
+        client.Dispose();
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_InputWithinContext_DoesNotThrow()
+    {
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(100);
+        var options = new ThinkingChatClientOptions
+        {
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 },
+            EnableContextInjection = false
+        };
+        var turnResult = TurnResult.Success(
+            new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
+            TurnMetrics.CreateBuilder().Build());
+        _turnManager.ProcessTurnAsync(Arg.Any<ThinkingContext>(),
+            Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
+
+        var client = new ThinkingChatClient(
+            _innerClient, _turnManager, options, tokenCounter: _tokenCounter);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+
+        var response = await client.GetResponseAsync(messages);
+        response.Should().NotBeNull();
+
+        client.Dispose();
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_NoTokenCounter_SkipsValidation()
+    {
+        var options = new ThinkingChatClientOptions
+        {
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 1 },
+            EnableContextInjection = false
+        };
+        var turnResult = TurnResult.Success(
+            new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
+            TurnMetrics.CreateBuilder().Build());
+        _turnManager.ProcessTurnAsync(Arg.Any<ThinkingContext>(),
+            Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
+
+        var client = new ThinkingChatClient(
+            _innerClient, _turnManager, options);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+
+        var response = await client.GetResponseAsync(messages);
+        response.Should().NotBeNull();
+
+        client.Dispose();
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_NoMaxContextTokens_SkipsValidation()
+    {
+        _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(999999);
+        var options = new ThinkingChatClientOptions
+        {
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = null },
+            EnableContextInjection = false
+        };
+        var turnResult = TurnResult.Success(
+            new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
+            TurnMetrics.CreateBuilder().Build());
+        _turnManager.ProcessTurnAsync(Arg.Any<ThinkingContext>(),
+            Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(Task.FromResult(turnResult));
+
+        var client = new ThinkingChatClient(
+            _innerClient, _turnManager, options, tokenCounter: _tokenCounter);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
+
+        var response = await client.GetResponseAsync(messages);
+        response.Should().NotBeNull();
+
+        client.Dispose();
     }
 }

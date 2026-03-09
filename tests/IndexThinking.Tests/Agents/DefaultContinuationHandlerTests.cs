@@ -485,6 +485,95 @@ public class DefaultContinuationHandlerTests
         Assert.Equal(1, result.ContinuationCount);
     }
 
+    [Fact]
+    public async Task HandleAsync_ReasoningOnlyContinuation_RetriesBeforeGivingUp()
+    {
+        // Arrange: continuation returns think-tagged reasoning that gets stripped to empty.
+        // The handler should retry (up to 2 consecutive empties) instead of breaking immediately.
+        var context = CreateContext(maxContinuations: 5);
+        var initialResponse = CreateResponse("### 1. First section\nContent here");
+
+        var sendCallCount = 0;
+        var detectCallCount = 0;
+
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                detectCallCount++;
+                // All continuations are truncated (model keeps producing garbage)
+                return detectCallCount <= 3
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
+
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                sendCallCount++;
+                return Task.FromResult(sendCallCount switch
+                {
+                    // Think-tagged reasoning → StripThinkTags removes → empty
+                    1 => CreateResponse("<think>I need to continue the response from where it was cut off.</think>"),
+                    2 => CreateResponse("<think>Let me check where the response was truncated.</think>"),
+                    // Would be real content, but loop should already break after 2 consecutive empties
+                    _ => CreateResponse("### 2. Second section\nMore real content"),
+                });
+            });
+
+        // Act
+        var result = await _handler.HandleAsync(context, initialResponse, sendRequest);
+
+        // Assert: should have attempted 2 continuations then stopped on consecutive empties
+        Assert.Equal(2, result.ContinuationCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_EmptyThenRealContent_ContinuesSuccessfully()
+    {
+        // Arrange: first continuation is think-tagged reasoning (stripped to empty),
+        // second has real content
+        var context = CreateContext(maxContinuations: 5);
+        var initialResponse = CreateResponse("### 1. First section\nContent here");
+
+        var sendCallCount = 0;
+        var detectCallCount = 0;
+
+        _truncationDetector
+            .Detect(Arg.Any<ChatResponse>())
+            .Returns(callInfo =>
+            {
+                detectCallCount++;
+                return detectCallCount <= 2
+                    ? TruncationInfo.Truncated(TruncationReason.TokenLimit)
+                    : TruncationInfo.NotTruncated;
+            });
+
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Any<IList<ChatMessage>>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                sendCallCount++;
+                return Task.FromResult(sendCallCount switch
+                {
+                    // First continuation: think-tagged reasoning → empty after stripping
+                    1 => CreateResponse("<think>I need to continue this response.</think>"),
+                    // Second continuation: actual content
+                    2 => CreateResponse("### 2. Second section\nReal continuation content"),
+                    _ => CreateResponse("Done")
+                });
+            });
+
+        // Act
+        var result = await _handler.HandleAsync(context, initialResponse, sendRequest);
+
+        // Assert: 2 continuations sent, consecutiveEmptyCount reset after real content
+        Assert.Equal(2, result.ContinuationCount);
+        Assert.Contains("First section", result.FinalResponse.Text);
+        Assert.Contains("Second section", result.FinalResponse.Text);
+    }
+
     private static ThinkingContext CreateContext(
         int maxContinuations = 5,
         bool throwOnMax = false,

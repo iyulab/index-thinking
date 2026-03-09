@@ -368,7 +368,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IContextTracker, InMemoryContextTracker>();
 
         services.TryAddSingleton(injectorOptions);
-        services.TryAddSingleton<IContextInjector, DefaultContextInjector>();
+        services.TryAddSingleton<IContextInjector>(sp =>
+            new DefaultContextInjector(
+                sp.GetRequiredService<ContextInjectorOptions>(),
+                sp.GetService<ITokenCounter>()));
 
         return services;
     }

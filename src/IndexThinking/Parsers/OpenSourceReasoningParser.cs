@@ -43,12 +43,12 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     // reasoning starters. Thinking models sometimes output inline reasoning after
     // structured content, especially in continuation responses where enable_thinking
     // is disabled or absent.
-    [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
+    [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
     private static partial Regex UntaggedReasoningRegex();
 
     // Detects reasoning starters at the beginning of text (no blank-line prefix required).
     // Used for leading reasoning detection in continuation fragments.
-    [GeneratedRegex(@"^(?:Okay|Wait|Let me|Looking|The user|However|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b")]
+    [GeneratedRegex(@"^(?:Okay|Wait|Let me|Looking|The user|However|Alternatively|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b")]
     private static partial Regex LeadingReasoningStarterRegex();
 
     private readonly DeepSeekThinkingConfig _config;
@@ -266,8 +266,8 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     /// Strips trailing untagged reasoning from text.
     /// Thinking models sometimes output inline reasoning (e.g. "Okay, I need to continue...")
     /// after structured content, especially in continuation responses where reasoning
-    /// flags are disabled. Only strips when the trailing block is substantial (&gt;200 chars)
-    /// and appears after at least 1/3 of the text.
+    /// flags are disabled. Only strips when there are at least 200 chars of actual content
+    /// before the reasoning marker and the trailing block is substantial (&gt;200 chars).
     /// </summary>
     /// <param name="text">The text potentially containing trailing reasoning.</param>
     /// <returns>The text with trailing reasoning removed.</returns>
@@ -280,7 +280,7 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
 
         var match = UntaggedReasoningRegex().Match(text);
         if (match.Success
-            && match.Index > text.Length / 3
+            && match.Index > 200
             && text.Length - match.Index > 200)
         {
             return text[..match.Index].TrimEnd();

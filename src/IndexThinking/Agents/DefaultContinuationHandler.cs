@@ -58,6 +58,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         var intermediateResponses = new List<ChatResponse> { initialResponse };
         var fragments = new List<string>();
         var continuationCount = 0;
+        var consecutiveEmptyCount = 0;
         var currentResponse = initialResponse;
         var elapsed = Stopwatch.StartNew();
 
@@ -137,7 +138,28 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             {
                 var stripped = OpenSourceReasoningParser.StripThinkTags(nextText);
                 stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
-                fragments.Add(stripped);
+
+                if (stripped.Length > 0)
+                {
+                    fragments.Add(stripped);
+                    consecutiveEmptyCount = 0;
+                }
+                else
+                {
+                    // Model returned reasoning-only output; don't pollute fragments
+                    // but track consecutive empties to prevent infinite loops
+                    consecutiveEmptyCount++;
+                }
+            }
+            else
+            {
+                consecutiveEmptyCount++;
+            }
+
+            // Break if multiple consecutive continuations produced no usable content
+            if (consecutiveEmptyCount >= 2)
+            {
+                break;
             }
 
             currentResponse = nextResponse;

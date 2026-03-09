@@ -98,6 +98,9 @@ public class ThinkingChatClient : DelegatingChatClient
         // Inject conversation context if enabled
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
+        // Validate input tokens fit within context window
+        ValidateInputTokens(enrichedMessages);
+
         // Create thinking context from messages and options
         var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
 
@@ -116,6 +119,13 @@ public class ThinkingChatClient : DelegatingChatClient
                     // Continuation requests: disable reasoning to prevent thinking leak
                     continuationOptions ??= CreateContinuationOptions(modifiedOptions);
                     opts = continuationOptions;
+                }
+                // Boost MaxOutputTokens for thinking models: thinking tokens consume
+                // the same max_tokens budget as content, so the original value is
+                // often too small to produce meaningful content.
+                if (isInitialRequest)
+                {
+                    opts = BoostMaxOutputTokensForThinking(opts);
                 }
                 isInitialRequest = false;
 
@@ -168,6 +178,9 @@ public class ThinkingChatClient : DelegatingChatClient
 
         // Inject conversation context if enabled
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
+
+        // Validate input tokens fit within context window
+        ValidateInputTokens(enrichedMessages);
 
         // Collect-and-Yield: buffer updates while streaming to caller
         var collectedUpdates = new List<ChatResponseUpdate>();
@@ -328,6 +341,29 @@ public class ThinkingChatClient : DelegatingChatClient
     }
 
     /// <summary>
+    /// Validates that input tokens do not exceed the configured context window.
+    /// </summary>
+    /// <exception cref="ContextWindowExceededException">When input tokens exceed the limit.</exception>
+    private void ValidateInputTokens(IList<ChatMessage> messages)
+    {
+        if (_tokenCounter is null)
+            return;
+
+        var maxContext = _options.DefaultContinuation.MaxContextTokens;
+        if (maxContext is null or <= 0)
+            return;
+
+        var inputTokens = 0;
+        foreach (var msg in messages)
+            inputTokens += _tokenCounter.Count(msg);
+
+        // Same 1.15x safety margin as CapMaxOutputTokens
+        var safeInputTokens = (int)(inputTokens * 1.15);
+        if (safeInputTokens > maxContext.Value)
+            throw new ContextWindowExceededException(inputTokens, maxContext.Value);
+    }
+
+    /// <summary>
     /// Tracks the conversation turn.
     /// </summary>
     private void TrackConversation(string sessionId, IList<ChatMessage> originalMessages, ChatResponse response)
@@ -392,6 +428,28 @@ public class ThinkingChatClient : DelegatingChatClient
         }
 
         return _options.SessionIdFactory();
+    }
+
+    /// <summary>
+    /// Boosts MaxOutputTokens for thinking models on the initial request.
+    /// Thinking models (DeepSeek, Qwen3, etc.) count thinking + content tokens together
+    /// against max_tokens, so the original value is often too small to produce useful content.
+    /// </summary>
+    private ChatOptions? BoostMaxOutputTokensForThinking(ChatOptions? options)
+    {
+        if (!_options.EnableReasoning || _options.ThinkingOutputMultiplier <= 1)
+        {
+            return options;
+        }
+
+        if (options?.MaxOutputTokens is null or <= 0)
+        {
+            return options;
+        }
+
+        var boosted = options.Clone();
+        boosted.MaxOutputTokens = options.MaxOutputTokens.Value * _options.ThinkingOutputMultiplier;
+        return boosted;
     }
 
     /// <summary>

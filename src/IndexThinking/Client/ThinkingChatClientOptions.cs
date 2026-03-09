@@ -48,6 +48,28 @@ public class ThinkingChatClientOptions
     /// </summary>
     public Func<string> SessionIdFactory { get; set; } = () => Guid.NewGuid().ToString("N");
 
+    private int? _maxContextTokens;
+
+    /// <summary>
+    /// Maximum context tokens for the model. When set, propagates to both
+    /// <see cref="ContinuationConfig.MaxContextTokens"/> and
+    /// <see cref="ContextInjectorOptions.MaxContextTokens"/>.
+    /// Default: null (uses individual component settings).
+    /// </summary>
+    public int? MaxContextTokens
+    {
+        get => _maxContextTokens;
+        set
+        {
+            _maxContextTokens = value;
+            if (value.HasValue)
+            {
+                DefaultContinuation = DefaultContinuation with { MaxContextTokens = value.Value };
+                ContextInjectorOptions.MaxContextTokens = value.Value;
+            }
+        }
+    }
+
     // ========================================
     // Context-Aware Chat Options (v0.9.0)
     // ========================================
@@ -124,4 +146,15 @@ public class ThinkingChatClientOptions
     /// Use this to override default field names or add model-specific settings.
     /// </summary>
     public OpenSourceReasoningRequestSettings? ReasoningRequestSettings { get; set; }
+
+    /// <summary>
+    /// Multiplier applied to MaxOutputTokens on the initial request when reasoning is enabled.
+    /// Thinking models (DeepSeek, Qwen3, etc.) consume thinking + content tokens from the same
+    /// max_tokens budget. A multiplier of 3 means if MaxOutputTokens is 4096, the initial request
+    /// sends max_tokens=12288, giving the model room for both thinking and content output.
+    /// The result is still capped by <see cref="ContinuationConfig.MaxContextTokens"/> via
+    /// <see cref="ThinkingChatClient.CapMaxOutputTokens"/>.
+    /// Default: 3. Set to 1 to disable boosting.
+    /// </summary>
+    public int ThinkingOutputMultiplier { get; set; } = 3;
 }

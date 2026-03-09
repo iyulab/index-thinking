@@ -481,7 +481,7 @@ public class OpenSourceReasoningParserTests
     [Fact]
     public void StripUntaggedReasoning_EarlyReasoning_DoesNotStrip()
     {
-        // Reasoning appears before 1/3 mark — not stripped (handled by StripLeadingUntaggedReasoning)
+        // Reasoning appears before 200 chars — not stripped (handled by StripLeadingUntaggedReasoning)
         var content = "Short content here.";
         var reasoning = "\n\nOkay, I need to think about this. " + new string('x', 1000);
         var input = content + reasoning;
@@ -489,6 +489,37 @@ public class OpenSourceReasoningParserTests
         var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
 
         result.Should().Be(input);
+    }
+
+    [Fact]
+    public void StripUntaggedReasoning_MassiveReasoningDwarfsContent_StillStrips()
+    {
+        // Bug reproduction: when reasoning block is much larger than content,
+        // proportional threshold (text.Length / 3) fails because content < total/3.
+        // Fixed: use absolute minimum (200 chars) instead of proportional threshold.
+        var content = new string('가', 300); // 300 chars — well above 200 minimum
+        var reasoning = "\n\nOkay, I need to continue the response. " +
+            new string('x', 200) + "\n\n" +
+            "Wait, let me check. " + new string('y', 200) + "\n\n" +
+            "The user wants more. " + new string('z', 5000); // massive reasoning block
+        var input = content + reasoning;
+
+        var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
+
+        result.Should().Be(content);
+    }
+
+    [Fact]
+    public void StripUntaggedReasoning_AlternativelyStarter_Strips()
+    {
+        var content = new string('가', 300);
+        var reasoning = "\n\nAlternatively, maybe the user wants something different. " +
+            new string('x', 300);
+        var input = content + reasoning;
+
+        var result = OpenSourceReasoningParser.StripUntaggedReasoning(input);
+
+        result.Should().Be(content);
     }
 
     #endregion

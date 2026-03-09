@@ -1,6 +1,8 @@
 using FluentAssertions;
+using IndexThinking.Abstractions;
 using IndexThinking.Context;
 using Microsoft.Extensions.AI;
+using NSubstitute;
 using Xunit;
 
 namespace IndexThinking.Tests.Context;
@@ -254,5 +256,134 @@ public class ContextInjectorOptionsTests
         // Assert
         options.EnableInjection.Should().BeFalse();
         options.MaxTurnsToInject.Should().Be(10);
+    }
+
+    [Fact]
+    public void Default_MaxContextTokens_IsNull()
+    {
+        var options = ContextInjectorOptions.Default;
+        options.MaxContextTokens.Should().BeNull();
+    }
+
+    [Fact]
+    public void CustomOptions_MaxContextTokens_CanBeSet()
+    {
+        var options = new ContextInjectorOptions { MaxContextTokens = 32000 };
+        options.MaxContextTokens.Should().Be(32000);
+    }
+}
+
+public class DefaultContextInjectorTokenBudgetTests
+{
+    [Fact]
+    public void InjectContext_WithTokenBudget_SkipsTurnsThatExceedBudget()
+    {
+        var tokenCounter = Substitute.For<ITokenCounter>();
+        tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(10);
+
+        var options = new ContextInjectorOptions
+        {
+            MaxContextTokens = 50,
+            MaxTurnsToInject = 5
+        };
+        var injector = new DefaultContextInjector(options, tokenCounter);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Current") };
+        var context = new ConversationContext
+        {
+            SessionId = "s1",
+            RecentTurns =
+            [
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "Old"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Old answer")])
+                },
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "Recent"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Recent answer")])
+                },
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "Latest"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Latest answer")])
+                }
+            ]
+        };
+
+        var result = injector.InjectContext(messages, context);
+
+        // Budget: 50 - 10 (current) = 40 for history
+        // Turn 3 (Latest): 20 -> fits (remaining: 20)
+        // Turn 2 (Recent): 20 -> fits (remaining: 0)
+        // Turn 1 (Old): 20 -> doesn't fit
+        result.Should().HaveCount(5); // 2 turns * 2 msgs + 1 current
+        result[0].Text.Should().Be("Recent");
+        result[^1].Text.Should().Be("Current");
+    }
+
+    [Fact]
+    public void InjectContext_WithTokenBudget_NoTokenCounter_FallsBackToTurnLimit()
+    {
+        var options = new ContextInjectorOptions
+        {
+            MaxContextTokens = 50,
+            MaxTurnsToInject = 1
+        };
+        var injector = new DefaultContextInjector(options);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Current") };
+        var context = new ConversationContext
+        {
+            SessionId = "s1",
+            RecentTurns =
+            [
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "T1"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "A1")])
+                },
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "T2"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "A2")])
+                }
+            ]
+        };
+
+        var result = injector.InjectContext(messages, context);
+
+        result.Should().HaveCount(3);
+        result[0].Text.Should().Be("T2");
+    }
+
+    [Fact]
+    public void InjectContext_BudgetTooSmallForAnyTurn_ReturnsOnlyCurrentMessages()
+    {
+        var tokenCounter = Substitute.For<ITokenCounter>();
+        tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(100);
+
+        var options = new ContextInjectorOptions { MaxContextTokens = 150 };
+        var injector = new DefaultContextInjector(options, tokenCounter);
+
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Current") };
+        var context = new ConversationContext
+        {
+            SessionId = "s1",
+            RecentTurns =
+            [
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "Prev"),
+                    AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Ans")])
+                }
+            ]
+        };
+
+        var result = injector.InjectContext(messages, context);
+
+        result.Should().HaveCount(1);
+        result[0].Text.Should().Be("Current");
     }
 }
