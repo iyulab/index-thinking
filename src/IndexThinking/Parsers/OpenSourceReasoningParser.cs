@@ -39,6 +39,13 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
     [GeneratedRegex(@"<think>(.*?)</think>", RegexOptions.Singleline)]
     private static partial Regex ThinkTagsRegex();
 
+    // Detects trailing untagged reasoning: blank line followed by common English
+    // reasoning starters. Thinking models sometimes output inline reasoning after
+    // structured content, especially in continuation responses where enable_thinking
+    // is disabled or absent.
+    [GeneratedRegex(@"\n[ \t]*\n(?=(?:Okay|Wait|Let me|Looking|The user|However|But (?:in|the|looking|according|since|this)|So (?:the|this|we|I)|Given|Therefore|This (?:is|suggests|means|implies|was)|I need|I should|Now (?:I|let|,)|First,|In the|Based on|Hmm|Actually|I (?:see|think|notice))\b)")]
+    private static partial Regex UntaggedReasoningRegex();
+
     private readonly DeepSeekThinkingConfig _config;
 
     /// <summary>
@@ -248,6 +255,33 @@ public sealed partial class OpenSourceReasoningParser : IReasoningParser
         }
 
         return text.Trim();
+    }
+
+    /// <summary>
+    /// Strips trailing untagged reasoning from text.
+    /// Thinking models sometimes output inline reasoning (e.g. "Okay, I need to continue...")
+    /// after structured content, especially in continuation responses where reasoning
+    /// flags are disabled. Only strips when the trailing block is substantial (&gt;200 chars)
+    /// and appears after at least 1/3 of the text.
+    /// </summary>
+    /// <param name="text">The text potentially containing trailing reasoning.</param>
+    /// <returns>The text with trailing reasoning removed.</returns>
+    public static string StripUntaggedReasoning(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        var match = UntaggedReasoningRegex().Match(text);
+        if (match.Success
+            && match.Index > text.Length / 3
+            && text.Length - match.Index > 200)
+        {
+            return text[..match.Index].TrimEnd();
+        }
+
+        return text;
     }
 
     /// <summary>

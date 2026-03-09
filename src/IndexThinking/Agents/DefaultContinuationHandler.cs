@@ -156,6 +156,10 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         // Combine fragments
         var combinedText = CombineFragments(fragments, config);
 
+        // Strip trailing untagged reasoning (continuation artifacts where the model
+        // responds with inline reasoning instead of actual content)
+        combinedText = OpenSourceReasoningParser.StripUntaggedReasoning(combinedText);
+
         // Apply content recovery
         combinedText = ApplyRecovery(combinedText, config);
 
