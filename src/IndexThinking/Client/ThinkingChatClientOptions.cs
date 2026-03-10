@@ -97,12 +97,12 @@ public class ThinkingChatClientOptions
     /// <summary>
     /// Context tracker options for session management.
     /// </summary>
-    public ContextTrackerOptions ContextTrackerOptions { get; set; } = ContextTrackerOptions.Default;
+    public ContextTrackerOptions ContextTrackerOptions { get; set; } = new();
 
     /// <summary>
     /// Context injector options for message injection.
     /// </summary>
-    public ContextInjectorOptions ContextInjectorOptions { get; set; } = ContextInjectorOptions.Default;
+    public ContextInjectorOptions ContextInjectorOptions { get; set; } = new();
 
     // ========================================
     // Reasoning Activation Options (v0.12.0)
