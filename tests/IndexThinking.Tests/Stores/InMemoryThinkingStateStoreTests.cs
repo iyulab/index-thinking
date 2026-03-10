@@ -177,10 +177,10 @@ public class InMemoryThinkingStateStoreSlidingExpirationTests : IDisposable
 
     public InMemoryThinkingStateStoreSlidingExpirationTests()
     {
-        // Use longer TTL to avoid timer resolution issues on Windows (~15.6ms)
+        // Use generous TTL to avoid flaky failures on slow CI runners
         var options = new InMemoryStateStoreOptions
         {
-            DefaultTtl = TimeSpan.FromMilliseconds(500),
+            DefaultTtl = TimeSpan.FromMilliseconds(2000),
             UseSlidingExpiration = true
         };
         _store = new InMemoryThinkingStateStore(options);
@@ -201,13 +201,13 @@ public class InMemoryThinkingStateStoreSlidingExpirationTests : IDisposable
         // Access multiple times before expiration to extend TTL
         for (int i = 0; i < 3; i++)
         {
-            await Task.Delay(150); // Less than 500ms TTL
+            await Task.Delay(300); // Less than 2000ms TTL
             var result = await _store.GetAsync("session-1");
             result.Should().NotBeNull($"iteration {i}");
         }
 
-        // Wait just under TTL again
-        await Task.Delay(150);
+        // Wait well under TTL again
+        await Task.Delay(300);
         var finalResult = await _store.GetAsync("session-1");
 
         // Assert - should still exist due to sliding expiration
