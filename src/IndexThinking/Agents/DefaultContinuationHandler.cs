@@ -130,14 +130,15 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             continuationCount++;
             intermediateResponses.Add(nextResponse);
 
-            // Collect fragment (strip think tags and leading reasoning per-fragment
-            // so combined text is clean). Continuation requests have enable_thinking=false,
-            // so models may output inline reasoning before actual content.
+            // Collect fragment (strip think tags per-fragment so combined text is clean).
+            // When reasoning was activated, continuation requests have enable_thinking=false,
+            // so models may output inline reasoning before actual content — strip it.
             var nextText = GetResponseText(nextResponse);
             if (!string.IsNullOrEmpty(nextText))
             {
                 var stripped = OpenSourceReasoningParser.StripThinkTags(nextText);
-                stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
+                if (context.ReasoningActivated)
+                    stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
 
                 if (stripped.Length > 0)
                 {
@@ -182,17 +183,23 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         // Combine fragments
         var combinedText = CombineFragments(fragments, config);
 
-        // Strip leading text that switches from Latin to CJK script
-        // (thinking models may leak English reasoning before CJK content)
-        combinedText = OpenSourceReasoningParser.StripLeadingByScriptShift(combinedText);
+        // Heuristic stripping: only when reasoning was activated.
+        // These patterns target thinking model artifacts and would corrupt
+        // legitimate content from non-thinking models.
+        if (context.ReasoningActivated)
+        {
+            // Strip leading text that switches from Latin to CJK script
+            // (thinking models may leak English reasoning before CJK content)
+            combinedText = OpenSourceReasoningParser.StripLeadingByScriptShift(combinedText);
 
-        // Strip trailing untagged reasoning (continuation artifacts where the model
-        // responds with inline reasoning instead of actual content)
-        combinedText = OpenSourceReasoningParser.StripUntaggedReasoning(combinedText);
+            // Strip trailing untagged reasoning (continuation artifacts where the model
+            // responds with inline reasoning instead of actual content)
+            combinedText = OpenSourceReasoningParser.StripUntaggedReasoning(combinedText);
 
-        // Strip trailing text that switches from CJK to Latin script
-        // (thinking models may leak English reasoning after CJK content)
-        combinedText = OpenSourceReasoningParser.StripTrailingByScriptShift(combinedText);
+            // Strip trailing text that switches from CJK to Latin script
+            // (thinking models may leak English reasoning after CJK content)
+            combinedText = OpenSourceReasoningParser.StripTrailingByScriptShift(combinedText);
+        }
 
         // Apply content recovery
         combinedText = ApplyRecovery(combinedText, config);

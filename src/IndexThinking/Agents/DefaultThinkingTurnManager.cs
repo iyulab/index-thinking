@@ -86,9 +86,12 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
             var (thinkingContent, reasoningState) = ParseReasoning(continuationResult.FinalResponse);
 
             // 5a. Strip think tags from response so consumers get clean content.
-            // Always attempt stripping — even when thinkingContent is null,
-            // orphaned </think> tags may remain (e.g., OpenAI SDK strips opening <think>).
-            StripThinkTagsFromResponse(continuationResult.FinalResponse);
+            // Always attempt literal <think> tag stripping — even when thinkingContent
+            // is null, orphaned </think> tags may remain.
+            // Heuristic stripping (untagged reasoning, script-shift) is only applied
+            // when reasoning was activated, to avoid corrupting responses from
+            // non-thinking models (e.g., Claude via OpenAI-compatible API).
+            StripThinkTagsFromResponse(continuationResult.FinalResponse, context.ReasoningActivated);
 
             // 6. Record metrics
             _budgetTracker.RecordResponse(continuationResult.FinalResponse, thinkingContent);
@@ -127,7 +130,7 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
         return total;
     }
 
-    private static void StripThinkTagsFromResponse(ChatResponse response)
+    private static void StripThinkTagsFromResponse(ChatResponse response, bool reasoningActivated)
     {
         foreach (var message in response.Messages)
         {
@@ -135,11 +138,20 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
             {
                 if (message.Contents[i] is TextContent textContent)
                 {
+                    // Always safe: remove literal <think>…</think> tags
                     var stripped = OpenSourceReasoningParser.StripThinkTags(textContent.Text);
-                    stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
-                    stripped = OpenSourceReasoningParser.StripLeadingByScriptShift(stripped);
-                    stripped = OpenSourceReasoningParser.StripUntaggedReasoning(stripped);
-                    stripped = OpenSourceReasoningParser.StripTrailingByScriptShift(stripped);
+
+                    // Heuristic stripping: only when reasoning was activated.
+                    // These patterns match common English phrases and CJK/Latin
+                    // transitions that are legitimate content in non-thinking models.
+                    if (reasoningActivated)
+                    {
+                        stripped = OpenSourceReasoningParser.StripLeadingUntaggedReasoning(stripped);
+                        stripped = OpenSourceReasoningParser.StripLeadingByScriptShift(stripped);
+                        stripped = OpenSourceReasoningParser.StripUntaggedReasoning(stripped);
+                        stripped = OpenSourceReasoningParser.StripTrailingByScriptShift(stripped);
+                    }
+
                     if (stripped != textContent.Text)
                     {
                         message.Contents[i] = new TextContent(stripped);

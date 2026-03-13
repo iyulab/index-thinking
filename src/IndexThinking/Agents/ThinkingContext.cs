@@ -54,6 +54,13 @@ public sealed record ThinkingContext
     public TaskComplexity? EstimatedComplexity { get; init; }
 
     /// <summary>
+    /// Whether reasoning was explicitly activated for this turn.
+    /// When false, aggressive response stripping (untagged reasoning, script-shift)
+    /// is skipped to avoid corrupting responses from non-thinking models.
+    /// </summary>
+    public bool ReasoningActivated { get; init; }
+
+    /// <summary>
     /// Model identifier (if known).
     /// </summary>
     public string? ModelId { get; init; }

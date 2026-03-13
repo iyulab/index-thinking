@@ -102,7 +102,7 @@ public class ThinkingChatClient : DelegatingChatClient
         ValidateInputTokens(enrichedMessages);
 
         // Create thinking context from messages and options
-        var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
+        var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
         // Wrap sendRequest to auto-cap MaxOutputTokens and disable reasoning on continuation
         var isInitialRequest = true;
@@ -197,7 +197,7 @@ public class ThinkingChatClient : DelegatingChatClient
         {
             var aggregatedResponse = collectedUpdates.ToChatResponse();
 
-            var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, cancellationToken);
+            var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
             var turnResult = await _turnManager.ProcessTurnAsync(
                 context,
@@ -242,11 +242,14 @@ public class ThinkingChatClient : DelegatingChatClient
         IList<ChatMessage> messages,
         ChatOptions? options,
         string sessionId,
+        bool reasoningActivated,
         CancellationToken cancellationToken)
     {
         var context = ThinkingContext.Create(sessionId, messages)
             .WithBudget(_options.DefaultBudget)
             .WithCancellation(cancellationToken);
+
+        context = context with { ReasoningActivated = reasoningActivated };
 
         // Apply continuation config
         context = context with { Continuation = _options.DefaultContinuation };
