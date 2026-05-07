@@ -133,19 +133,19 @@ IndexThinking은 Orchestrator가 각 LLM 호출에서 사용하는 **building bl
 #### 1. Project Structure Setup
 ```
 src/
-├── IndexThinking/                    # Core library
+├── IndexThinking/                    # Core library (public API)
 │   ├── IndexThinking.csproj
 │   ├── Abstractions/                 # Interfaces
 │   ├── Core/                         # Records, enums
 │   └── Extensions/                   # Extension methods
-├── IndexThinking.SDK/                # Public API
-│   └── IndexThinking.SDK.csproj
 tests/
 ├── IndexThinking.Tests/              # Unit tests
 │   └── IndexThinking.Tests.csproj
 └── IndexThinking.IntegrationTests/   # Integration tests
     └── IndexThinking.IntegrationTests.csproj
 ```
+
+> **Note:** `IndexThinking.SDK` was removed as an empty pass-through package. Reference `IndexThinking` directly (`dotnet add package IndexThinking`).
 
 - [ ] Create `tests/IndexThinking.Tests` project with xUnit
 - [ ] Create `tests/IndexThinking.IntegrationTests` project
