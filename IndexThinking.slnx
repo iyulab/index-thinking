@@ -9,7 +9,6 @@
     <Project Path="samples/IndexThinking.Samples.WebApi/IndexThinking.Samples.WebApi.csproj" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/IndexThinking.SDK/IndexThinking.SDK.csproj" />
     <Project Path="src/IndexThinking/IndexThinking.csproj" />
   </Folder>
   <Folder Name="/tests/">
