@@ -41,14 +41,12 @@ jobs:
       - name: Restore dependencies
         run: |
           dotnet restore src/IndexThinking/IndexThinking.csproj
-          dotnet restore src/IndexThinking.SDK/IndexThinking.SDK.csproj
           dotnet restore tests/IndexThinking.Tests/IndexThinking.Tests.csproj
           dotnet restore tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj
 
       - name: Build
         run: |
           dotnet build src/IndexThinking/IndexThinking.csproj --no-restore --configuration Release
-          dotnet build src/IndexThinking.SDK/IndexThinking.SDK.csproj --no-restore --configuration Release
           dotnet build tests/IndexThinking.Tests/IndexThinking.Tests.csproj --no-restore --configuration Release
           dotnet build tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-restore --configuration Release
 
@@ -83,12 +81,10 @@ jobs:
       - name: Build Release
         run: |
           dotnet build src/IndexThinking/IndexThinking.csproj --configuration Release
-          dotnet build src/IndexThinking.SDK/IndexThinking.SDK.csproj --configuration Release
 
       - name: Pack NuGet packages
         run: |
           dotnet pack src/IndexThinking/IndexThinking.csproj --configuration Release --no-build --output ./nupkgs
-          dotnet pack src/IndexThinking.SDK/IndexThinking.SDK.csproj --configuration Release --no-build --output ./nupkgs
 
       - name: List packages
         run: ls -la ./nupkgs
