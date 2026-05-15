@@ -100,6 +100,15 @@ var client = new ChatClientBuilder(innerClient)
     .Build(serviceProvider);
 ```
 
+#### Inline Reasoning Stripping (Automatic)
+
+When reasoning is disabled on continuation requests (to avoid double-billing thinking tokens), open-source models sometimes output inline reasoning text instead of properly tagged content. IndexThinking automatically strips these fragments:
+
+- **`StripLeadingUntaggedReasoning`** — removes reasoning paragraphs that appear at the start of a continuation fragment (≥2 consecutive reasoning paragraphs required before stripping)
+- **`StripUntaggedReasoning`** — removes trailing reasoning that appears after the actual answer content (requires ≥200 chars of content before the marker and ≥200 chars of trailing reasoning)
+
+Both methods are called automatically by the continuation pipeline. They are also available as static methods on `OpenSourceReasoningParser` for manual use.
+
 ## Documentation
 
 - [Architecture & Design](docs/ROADMAP.md)
