@@ -263,10 +263,9 @@ public class TokenCounterChainTests
     }
 
     [Fact]
-    public void ImplementsTokenMeterAbstractionsInterface()
+    public void ImplementsITokenCounterInterface()
     {
-        // Verify that TokenCounterChain implements the base interface
         var chain = new TokenCounterChain(new[] { new ApproximateTokenCounter() });
-        chain.Should().BeAssignableTo<TokenMeter.Abstractions.ITokenCounter>();
+        chain.Should().BeAssignableTo<IndexThinking.Abstractions.ITokenCounter>();
     }
 }

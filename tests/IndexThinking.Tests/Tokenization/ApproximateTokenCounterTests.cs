@@ -268,9 +268,8 @@ public class ApproximateTokenCounterTests
     }
 
     [Fact]
-    public void ImplementsTokenMeterAbstractionsInterface()
+    public void ImplementsITokenCounterInterface()
     {
-        // Verify that ApproximateTokenCounter implements the base interface
-        _counter.Should().BeAssignableTo<TokenMeter.Abstractions.ITokenCounter>();
+        _counter.Should().BeAssignableTo<IndexThinking.Abstractions.ITokenCounter>();
     }
 }

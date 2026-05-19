@@ -223,18 +223,16 @@ public class TiktokenTokenCounterTests
     public void IsApproximate_AnyModel_ReturnsFalse()
     {
         // TiktokenTokenCounter is exact, not approximate
-        // The DIM from TokenMeter.Abstractions.ITokenCounter defaults to false
         // CA1859: interface type required to access default interface method
 #pragma warning disable CA1859
-        global::TokenMeter.Abstractions.ITokenCounter baseCounter = _counter;
+        IndexThinking.Abstractions.ITokenCounter baseCounter = _counter;
 #pragma warning restore CA1859
         baseCounter.IsApproximate("gpt-4o").Should().BeFalse();
     }
 
     [Fact]
-    public void ImplementsTokenMeterAbstractionsInterface()
+    public void ImplementsITokenCounterInterface()
     {
-        // Verify that TiktokenTokenCounter implements the base interface
-        _counter.Should().BeAssignableTo<global::TokenMeter.Abstractions.ITokenCounter>();
+        _counter.Should().BeAssignableTo<IndexThinking.Abstractions.ITokenCounter>();
     }
 }
