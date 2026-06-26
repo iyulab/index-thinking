@@ -10,6 +10,10 @@
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.0" />
+    <!-- Security pin: Microsoft.ML.Tokenizers.Data.* 2.0.0 floats Microsoft.Bcl.Memory >=9.0.4,
+         resolving to vulnerable 9.0.4 (NU1903 / GHSA-73j8-2gch-69rq / CVE-2026-26127, Base64Url
+         OOB-read DoS). Pin patched 10.0.8 (>=10.0.4) so the fix flows to IndexThinking consumers. -->
+    <PackageVersion Include="Microsoft.Bcl.Memory" Version="10.0.8" />
     <!-- Storage -->
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <!-- Distributed Caching -->

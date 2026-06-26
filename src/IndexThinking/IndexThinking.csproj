@@ -13,6 +13,9 @@
     <PackageReference Include="Microsoft.ML.Tokenizers" />
     <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" />
     <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" />
+    <!-- Security pin: forces patched Microsoft.Bcl.Memory (>=10.0.4) over the 9.0.4 floated by
+         the Tokenizers.Data packages above, so consumers do not inherit NU1903 transitively. -->
+    <PackageReference Include="Microsoft.Bcl.Memory" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
