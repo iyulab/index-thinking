@@ -157,4 +157,41 @@ public class ThinkingChatClientOptions
     /// Default: 2. Set to 1 to disable boosting.
     /// </summary>
     public int ThinkingOutputMultiplier { get; set; } = 2;
+
+    // ========================================
+    // Live Streaming Reasoning Separation (v0.20.0)
+    // ========================================
+
+    /// <summary>
+    /// Whether to separate inline XML-tag reasoning from answer text DURING streaming.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Open-source / local providers (DeepSeek, Qwen3, vLLM-served, local gemma, etc.) emit reasoning
+    /// inline in the text delta as <c>&lt;think&gt;…&lt;/think&gt;</c> rather than as a distinct reasoning
+    /// channel. When this is enabled, <see cref="ThinkingChatClient.GetStreamingResponseAsync"/> runs each
+    /// text delta through an incremental tag state machine (tolerant of tags split across chunk boundaries)
+    /// and re-emits reasoning spans as <see cref="Microsoft.Extensions.AI.TextReasoningContent"/> and the
+    /// remaining text as <see cref="Microsoft.Extensions.AI.TextContent"/> — so a consumer can render live
+    /// "thinking" UI without writing its own stateful tag splitter.
+    /// </para>
+    /// <para>
+    /// Native reasoning providers (OpenAI o-series, Anthropic, Gemini) already emit a separate reasoning
+    /// channel and do not carry these tags inline, so enabling this option is a no-op for them (no double
+    /// classification). Default: <c>false</c> — preserves the existing raw pass-through (zero regression).
+    /// </para>
+    /// </remarks>
+    public bool SeparateReasoningInStream { get; set; }
+
+    /// <summary>
+    /// Opening tag delimiting inline reasoning when <see cref="SeparateReasoningInStream"/> is enabled.
+    /// Default: <c>&lt;think&gt;</c> (the open-source/DeepSeek/Qwen convention).
+    /// </summary>
+    public string StreamingReasoningStartTag { get; set; } = "<think>";
+
+    /// <summary>
+    /// Closing tag delimiting inline reasoning when <see cref="SeparateReasoningInStream"/> is enabled.
+    /// Default: <c>&lt;/think&gt;</c>.
+    /// </summary>
+    public string StreamingReasoningEndTag { get; set; } = "</think>";
 }

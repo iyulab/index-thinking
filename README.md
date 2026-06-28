@@ -75,6 +75,34 @@ await foreach (var update in client.GetStreamingResponseAsync(messages))
 }
 ```
 
+#### Live reasoning separation (opt-in)
+
+Open-source / local providers (DeepSeek, Qwen3, vLLM-served) emit reasoning inline in the text delta as
+`<think>…</think>` rather than as a separate channel. Enable `SeparateReasoningInStream` to have IndexThinking
+split it live — answer text arrives as `TextContent`, reasoning as `TextReasoningContent` — even when a tag is
+split across chunk boundaries. No bespoke tag parser needed. Default is off (raw pass-through). Native reasoning
+providers (OpenAI o-series, Anthropic, Gemini) already emit a separate channel, so this is a no-op for them.
+
+```csharp
+var options = new ThinkingChatClientOptions
+{
+    SeparateReasoningInStream = true,        // default false
+    // StreamingReasoningStartTag = "<think>",  // defaults shown
+    // StreamingReasoningEndTag   = "</think>",
+};
+
+await foreach (var update in client.GetStreamingResponseAsync(messages))
+{
+    foreach (var content in update.Contents)
+    {
+        if (content is TextReasoningContent reasoning)
+            RenderThinking(reasoning.Text);   // live "💭 thinking…" UI
+        else if (content is TextContent answer)
+            RenderAnswer(answer.Text);
+    }
+}
+```
+
 ## Supported Providers
 
 | Provider | Reasoning Format | Truncation Handling | Requires Activation |

@@ -182,14 +182,28 @@ public class ThinkingChatClient : DelegatingChatClient
         // Validate input tokens fit within context window
         ValidateInputTokens(enrichedMessages);
 
-        // Collect-and-Yield: buffer updates while streaming to caller
+        // Collect-and-Yield: buffer updates while streaming to caller. The collected updates are always the
+        // ORIGINAL (raw) updates so post-stream orchestration (reasoning parsing, turn manager) is unchanged;
+        // only what is YIELDED to the caller is optionally transformed for live reasoning separation.
         var collectedUpdates = new List<ChatResponseUpdate>();
+
+        var separator = _options.SeparateReasoningInStream
+            ? new StreamingReasoningSeparator(_options.StreamingReasoningStartTag, _options.StreamingReasoningEndTag)
+            : null;
 
         await foreach (var update in base.GetStreamingResponseAsync(enrichedMessages, modifiedOptions, cancellationToken)
             .ConfigureAwait(false))
         {
             collectedUpdates.Add(update);
-            yield return update;
+            yield return separator is null ? update : SeparateUpdate(update, separator);
+        }
+
+        // Flush any text held back while waiting to disambiguate a chunk-straddling tag.
+        if (separator is not null)
+        {
+            var tail = separator.Flush();
+            if (tail is { } seg && seg.Text.Length > 0)
+                yield return new ChatResponseUpdate { Contents = [ToSeparatedContent(seg)] };
         }
 
         // Post-stream orchestration: aggregate and process through turn manager
@@ -234,6 +248,63 @@ public class ThinkingChatClient : DelegatingChatClient
             yield return metadataUpdate;
         }
     }
+
+    /// <summary>
+    /// Rewrites a streaming update's <see cref="TextContent"/> deltas into separated
+    /// <see cref="TextReasoningContent"/> (reasoning) and <see cref="TextContent"/> (answer) spans via the
+    /// incremental separator. Non-text content and updates without text pass through unchanged.
+    /// </summary>
+    private static ChatResponseUpdate SeparateUpdate(ChatResponseUpdate update, StreamingReasoningSeparator separator)
+    {
+        var hasText = false;
+        foreach (var content in update.Contents)
+        {
+            if (content is TextContent { Text.Length: > 0 })
+            {
+                hasText = true;
+                break;
+            }
+        }
+
+        if (!hasText)
+            return update;
+
+        var newContents = new List<AIContent>(update.Contents.Count);
+        foreach (var content in update.Contents)
+        {
+            if (content is TextContent tc && tc.Text.Length > 0)
+            {
+                foreach (var segment in separator.Process(tc.Text))
+                {
+                    if (segment.Text.Length > 0)
+                        newContents.Add(ToSeparatedContent(segment));
+                }
+            }
+            else
+            {
+                newContents.Add(content);
+            }
+        }
+
+        // Clone the update (the original is retained in collectedUpdates for unchanged post-stream parsing).
+        return new ChatResponseUpdate
+        {
+            Contents = newContents,
+            Role = update.Role,
+            AuthorName = update.AuthorName,
+            ResponseId = update.ResponseId,
+            MessageId = update.MessageId,
+            ConversationId = update.ConversationId,
+            CreatedAt = update.CreatedAt,
+            FinishReason = update.FinishReason,
+            ModelId = update.ModelId,
+            AdditionalProperties = update.AdditionalProperties,
+            RawRepresentation = update.RawRepresentation,
+        };
+    }
+
+    private static AIContent ToSeparatedContent(StreamingReasoningSeparator.Segment segment) =>
+        segment.IsReasoning ? new TextReasoningContent(segment.Text) : new TextContent(segment.Text);
 
     /// <summary>
     /// Creates a <see cref="ThinkingContext"/> from the request.
