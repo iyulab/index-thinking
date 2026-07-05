@@ -13,7 +13,7 @@
          Microsoft.Data.Sqlite — no patched bundle yet. Bcl.Memory NU1903 is fixed by the 10.0.8 pin
          in Directory.Packages.props, not by this suppression. -->
     <NoWarn>$(NoWarn);CS1591;NU1903</NoWarn>
-    <Version>0.20.0</Version>
+    <Version>0.21.0</Version>
   </PropertyGroup>
 
   <!-- NuGet Package Metadata -->

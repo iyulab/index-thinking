@@ -728,13 +728,13 @@ public class ThinkingChatClientInputValidationTests : IDisposable
 {
     private readonly IChatClient _innerClient;
     private readonly IThinkingTurnManager _turnManager;
-    private readonly ITokenCounter _tokenCounter;
+    private readonly IChatMessageTokenCounter _tokenCounter;
 
     public ThinkingChatClientInputValidationTests()
     {
         _innerClient = Substitute.For<IChatClient>();
         _turnManager = Substitute.For<IThinkingTurnManager>();
-        _tokenCounter = Substitute.For<ITokenCounter>();
+        _tokenCounter = Substitute.For<IChatMessageTokenCounter>();
     }
 
     public void Dispose()

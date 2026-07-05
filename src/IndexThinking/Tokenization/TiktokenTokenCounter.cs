@@ -8,7 +8,7 @@ namespace IndexThinking.Tokenization;
 /// Token counter using Microsoft.ML.Tokenizers for OpenAI models.
 /// Provides exact token counts matching the official tiktoken library.
 /// </summary>
-public sealed class TiktokenTokenCounter : ITokenCounter
+public sealed class TiktokenTokenCounter : IChatMessageTokenCounter
 {
     private readonly TiktokenTokenizer _tokenizer;
     private readonly string _encoding;

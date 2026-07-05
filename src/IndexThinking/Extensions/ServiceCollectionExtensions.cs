@@ -140,8 +140,12 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Register tokenization and truncation detection services
-        services.TryAddSingleton<ITokenCounter, ApproximateTokenCounter>();
+        // Register tokenization and truncation detection services.
+        // Single ApproximateTokenCounter instance serves both the neutral core interface
+        // and the M.E.AI chat-message extension interface.
+        services.TryAddSingleton<ApproximateTokenCounter>();
+        services.TryAddSingleton<ITokenCounter>(sp => sp.GetRequiredService<ApproximateTokenCounter>());
+        services.TryAddSingleton<IChatMessageTokenCounter>(sp => sp.GetRequiredService<ApproximateTokenCounter>());
         services.TryAddSingleton<ITruncationDetector, TruncationDetector>();
 
         // Register core agent services

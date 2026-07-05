@@ -429,7 +429,7 @@ public class ThinkingChatClient : DelegatingChatClient
 
         var inputTokens = 0;
         foreach (var msg in messages)
-            inputTokens += _tokenCounter.Count(msg);
+            inputTokens += _tokenCounter.CountMessage(msg);
 
         // Same 1.15x safety margin as CapMaxOutputTokens
         var safeInputTokens = (int)(inputTokens * 1.15);
@@ -560,7 +560,7 @@ public class ThinkingChatClient : DelegatingChatClient
         var inputTokens = 0;
         foreach (var msg in messages)
         {
-            inputTokens += _tokenCounter.Count(msg);
+            inputTokens += _tokenCounter.CountMessage(msg);
         }
 
         // Light safety margin for approximate token counting.

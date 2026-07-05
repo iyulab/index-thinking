@@ -278,7 +278,7 @@ public class DefaultContextInjectorTokenBudgetTests
     [Fact]
     public void InjectContext_WithTokenBudget_SkipsTurnsThatExceedBudget()
     {
-        var tokenCounter = Substitute.For<ITokenCounter>();
+        var tokenCounter = Substitute.For<IChatMessageTokenCounter>();
         tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(10);
 
         var options = new ContextInjectorOptions
@@ -361,7 +361,7 @@ public class DefaultContextInjectorTokenBudgetTests
     [Fact]
     public void InjectContext_BudgetTooSmallForAnyTurn_ReturnsOnlyCurrentMessages()
     {
-        var tokenCounter = Substitute.For<ITokenCounter>();
+        var tokenCounter = Substitute.For<IChatMessageTokenCounter>();
         tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(100);
 
         var options = new ContextInjectorOptions { MaxContextTokens = 150 };

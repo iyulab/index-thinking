@@ -25,6 +25,8 @@ IndexThinking manages a **single LLM turn**, not multi-step workflows.
 | Building block | Workflow controller |
 | Used BY orchestrators | Uses IndexThinking |
 
+**Token counting role boundary** — IndexThinking owns token *counting* (`ITokenCounter`, framework-neutral; `IChatMessageTokenCounter` for M.E.AI `ChatMessage` counting). Model *metadata* (context window, pricing) belongs to TokenMeter; combining the two into budget enforcement belongs to the consuming pipeline.
+
 ## Quick Start
 
 ```bash

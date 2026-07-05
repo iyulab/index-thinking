@@ -114,7 +114,7 @@ public sealed class DefaultContextInjector : IContextInjector
         var currentTokens = 0;
         foreach (var message in currentMessages)
         {
-            currentTokens += _tokenCounter!.Count(message);
+            currentTokens += _tokenCounter!.CountMessage(message);
         }
 
         var remainingBudget = maxTokens - currentTokens;
@@ -128,13 +128,13 @@ public sealed class DefaultContextInjector : IContextInjector
         for (var i = turns.Count - 1; i >= 0; i--)
         {
             var turn = turns[i];
-            var turnTokens = _tokenCounter!.Count(turn.UserMessage);
+            var turnTokens = _tokenCounter!.CountMessage(turn.UserMessage);
 
             if (turn.AssistantResponse?.Messages != null)
             {
                 foreach (var msg in turn.AssistantResponse.Messages)
                 {
-                    turnTokens += _tokenCounter.Count(msg);
+                    turnTokens += _tokenCounter!.CountMessage(msg);
                 }
             }
 

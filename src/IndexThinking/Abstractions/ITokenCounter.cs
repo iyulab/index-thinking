@@ -1,9 +1,9 @@
-using Microsoft.Extensions.AI;
-
 namespace IndexThinking.Abstractions;
 
 /// <summary>
-/// Token counter with ChatMessage support for IndexThinking.
+/// Type-neutral token counter: text and model-level members only, no framework message types.
+/// Consumers with their own message shapes can implement or consume this interface without a
+/// Microsoft.Extensions.AI type coupling; M.E.AI consumers use <see cref="IChatMessageTokenCounter"/>.
 /// </summary>
 public interface ITokenCounter
 {
@@ -18,11 +18,4 @@ public interface ITokenCounter
 
     /// <summary>Returns true if this counter produces approximate results for the given model.</summary>
     bool IsApproximate(string modelId) => false;
-
-    /// <summary>
-    /// Counts tokens for a chat message (includes role overhead).
-    /// </summary>
-    /// <param name="message">The chat message to count tokens for.</param>
-    /// <returns>The estimated token count including message overhead.</returns>
-    int Count(ChatMessage message);
 }

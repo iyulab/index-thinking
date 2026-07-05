@@ -112,7 +112,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
                     var compactTokens = 0;
                     foreach (var msg in continuationMessages)
                     {
-                        compactTokens += _tokenCounter.Count(msg);
+                        compactTokens += _tokenCounter.CountMessage(msg);
                     }
 
                     if (compactTokens > config.MaxContextTokens.Value)
@@ -249,7 +249,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         var total = 0;
         foreach (var message in continuationMessages)
         {
-            total += _tokenCounter.Count(message);
+            total += _tokenCounter.CountMessage(message);
         }
         return total;
     }
@@ -309,7 +309,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
                 previousText = OpenSourceReasoningParser.StripThinkTags(previousText);
 
                 // Calculate budget for the response tail
-                var systemTokens = systemMessage is not null ? _tokenCounter.Count(systemMessage) : 0;
+                var systemTokens = systemMessage is not null ? _tokenCounter.CountMessage(systemMessage) : 0;
                 var promptTokens = _tokenCounter.Count(config.ContinuationPrompt);
                 // Reserve half the remaining budget for the model's output
                 var responseBudget = (maxContextTokens - systemTokens - promptTokens) / 2;

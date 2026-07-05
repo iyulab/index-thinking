@@ -7,7 +7,7 @@ namespace IndexThinking.Tokenization;
 /// Token counter that tries multiple counters in order until one supports the model.
 /// Implements fallback chain: Exact → Encoding-based → Approximate.
 /// </summary>
-public sealed class TokenCounterChain : ITokenCounter
+public sealed class TokenCounterChain : IChatMessageTokenCounter
 {
     private readonly List<ITokenCounter> _counters;
     private readonly string? _modelId;
@@ -62,7 +62,7 @@ public sealed class TokenCounterChain : ITokenCounter
     public int Count(ChatMessage message)
     {
         var counter = GetSupportingCounter();
-        return counter.Count(message);
+        return counter.CountMessage(message);
     }
 
     /// <inheritdoc />

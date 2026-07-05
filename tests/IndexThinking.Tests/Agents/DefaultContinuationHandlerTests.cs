@@ -11,13 +11,13 @@ namespace IndexThinking.Tests.Agents;
 public class DefaultContinuationHandlerTests
 {
     private readonly ITruncationDetector _truncationDetector;
-    private readonly ITokenCounter _tokenCounter;
+    private readonly IChatMessageTokenCounter _tokenCounter;
     private readonly DefaultContinuationHandler _handler;
 
     public DefaultContinuationHandlerTests()
     {
         _truncationDetector = Substitute.For<ITruncationDetector>();
-        _tokenCounter = Substitute.For<ITokenCounter>();
+        _tokenCounter = Substitute.For<IChatMessageTokenCounter>();
         // Default: each message ~10 tokens, each string ~5 tokens
         _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(10);
         _tokenCounter.Count(Arg.Any<string>()).Returns(5);

@@ -125,7 +125,7 @@ public sealed class DefaultThinkingTurnManager : IThinkingTurnManager
         var total = 0;
         foreach (var message in messages)
         {
-            total += _tokenCounter.Count(message);
+            total += _tokenCounter.CountMessage(message);
         }
         return total;
     }

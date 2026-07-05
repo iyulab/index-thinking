@@ -13,7 +13,7 @@ public class DefaultThinkingTurnManagerTests
     private readonly IContinuationHandler _continuationHandler;
     private readonly IBudgetTracker _budgetTracker;
     private readonly IReasoningParser _parser;
-    private readonly ITokenCounter _tokenCounter;
+    private readonly IChatMessageTokenCounter _tokenCounter;
     private readonly IThinkingStateStore _stateStore;
     private readonly DefaultThinkingTurnManager _manager;
 
@@ -23,7 +23,7 @@ public class DefaultThinkingTurnManagerTests
         _continuationHandler = Substitute.For<IContinuationHandler>();
         _budgetTracker = Substitute.For<IBudgetTracker>();
         _parser = Substitute.For<IReasoningParser>();
-        _tokenCounter = Substitute.For<ITokenCounter>();
+        _tokenCounter = Substitute.For<IChatMessageTokenCounter>();
         _stateStore = Substitute.For<IThinkingStateStore>();
 
         // Default setups

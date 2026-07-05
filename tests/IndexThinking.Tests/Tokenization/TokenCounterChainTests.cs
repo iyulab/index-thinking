@@ -187,7 +187,7 @@ public class TokenCounterChainTests
     public void Count_ChatMessage_DelegatesToCounter()
     {
         // Arrange
-        var mockCounter = Substitute.For<ITokenCounter>();
+        var mockCounter = Substitute.For<IChatMessageTokenCounter>();
         var message = new ChatMessage(ChatRole.User, "Hello");
         mockCounter.SupportsModel(Arg.Any<string>()).Returns(true);
         mockCounter.Count(message).Returns(10);

@@ -12,7 +12,7 @@ namespace IndexThinking.Tokenization;
 /// This counter provides estimates that are typically within ±20% of actual token counts.
 /// It uses language detection to apply appropriate ratios for different scripts.
 /// </remarks>
-public sealed class ApproximateTokenCounter : ITokenCounter
+public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
 {
     private readonly LanguageRatios _ratios;
 
