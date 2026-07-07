@@ -85,6 +85,10 @@ split it live — answer text arrives as `TextContent`, reasoning as `TextReason
 split across chunk boundaries. No bespoke tag parser needed. Default is off (raw pass-through). Native reasoning
 providers (OpenAI o-series, Anthropic, Gemini) already emit a separate channel, so this is a no-op for them.
 
+> **Migration note:** with separation enabled, reasoning spans are no longer part of `ChatResponseUpdate.Text`
+> (which concatenates `TextContent` only). Consumers reading `update.Text` must switch to iterating
+> `update.Contents` (as below) or reasoning deltas will be silently dropped.
+
 ```csharp
 var options = new ThinkingChatClientOptions
 {
