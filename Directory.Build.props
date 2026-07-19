@@ -9,11 +9,8 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- NU1903 remaining cause: SQLitePCLRaw.lib.e_sqlite3 2.1.11 (CVE-2025-6965), transitive via
-         Microsoft.Data.Sqlite — no patched bundle yet. Bcl.Memory NU1903 is fixed by the 10.0.8 pin
-         in Directory.Packages.props, not by this suppression. -->
-    <NoWarn>$(NoWarn);CS1591;NU1903</NoWarn>
-    <Version>0.21.0</Version>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Version>0.21.1</Version>
   </PropertyGroup>
 
   <!-- NuGet Package Metadata -->

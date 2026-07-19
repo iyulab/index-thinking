@@ -17,6 +17,8 @@
          the Tokenizers.Data packages above, so consumers do not inherit NU1903 transitively. -->
     <PackageReference Include="Microsoft.Bcl.Memory" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- Lifts the vulnerable SQLitePCLRaw 2.1.11 that Microsoft.Data.Sqlite drags in (GHSA-2m69-gcr7-jv3q). -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
