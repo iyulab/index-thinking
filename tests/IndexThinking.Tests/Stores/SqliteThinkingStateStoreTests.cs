@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Core;
 using IndexThinking.Stores;
 using Microsoft.Data.Sqlite;

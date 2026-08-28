@@ -1,5 +1,5 @@
 using System.Text;
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Client;
 using IndexThinking.SimulationTests.Fixtures;
 using Microsoft.Extensions.AI;

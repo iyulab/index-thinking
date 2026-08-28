@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Core;
 using IndexThinking.Parsers;
 using IndexThinking.Parsers.Models;

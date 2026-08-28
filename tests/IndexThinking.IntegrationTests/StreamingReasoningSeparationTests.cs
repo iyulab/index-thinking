@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Client;
 using IndexThinking.Extensions;
 using Microsoft.Extensions.AI;

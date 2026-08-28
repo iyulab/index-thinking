@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Continuation;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;

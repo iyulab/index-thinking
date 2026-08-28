@@ -1,4 +1,4 @@
-using FluentAssertions;
+using AwesomeAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Extensions;
 using IndexThinking.Memory;
