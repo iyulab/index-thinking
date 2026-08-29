@@ -40,8 +40,8 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("session-1");
 
         // Act
-        await store.SetAsync("session-1", state);
-        var result = await store.GetAsync("session-1");
+        await store.SetAsync("session-1", state, TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -64,12 +64,12 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("session-ttl");
 
         // Act
-        await store.SetAsync("session-ttl", state);
+        await store.SetAsync("session-ttl", state, TestContext.Current.CancellationToken);
 
         // Wait for expiration
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
-        var result = await store.GetAsync("session-ttl");
+        var result = await store.GetAsync("session-ttl", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -82,11 +82,11 @@ public class StateStorageIntegrationTests
         var store = new InMemoryThinkingStateStore();
         var state = CreateTestState("session-remove");
 
-        await store.SetAsync("session-remove", state);
+        await store.SetAsync("session-remove", state, TestContext.Current.CancellationToken);
 
         // Act
-        await store.RemoveAsync("session-remove");
-        var result = await store.GetAsync("session-remove");
+        await store.RemoveAsync("session-remove", TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("session-remove", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -100,12 +100,12 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("session-exists");
 
         // Act & Assert - Before
-        (await store.ExistsAsync("session-exists")).Should().BeFalse();
+        (await store.ExistsAsync("session-exists", TestContext.Current.CancellationToken)).Should().BeFalse();
 
-        await store.SetAsync("session-exists", state);
+        await store.SetAsync("session-exists", state, TestContext.Current.CancellationToken);
 
         // Act & Assert - After
-        (await store.ExistsAsync("session-exists")).Should().BeTrue();
+        (await store.ExistsAsync("session-exists", TestContext.Current.CancellationToken)).Should().BeTrue();
     }
 
     [Fact]
@@ -117,11 +117,11 @@ public class StateStorageIntegrationTests
         var state2 = CreateTestState("session-2") with { TotalThinkingTokens = 200 };
 
         // Act
-        await store.SetAsync("session-1", state1);
-        await store.SetAsync("session-2", state2);
+        await store.SetAsync("session-1", state1, TestContext.Current.CancellationToken);
+        await store.SetAsync("session-2", state2, TestContext.Current.CancellationToken);
 
-        var result1 = await store.GetAsync("session-1");
-        var result2 = await store.GetAsync("session-2");
+        var result1 = await store.GetAsync("session-1", TestContext.Current.CancellationToken);
+        var result2 = await store.GetAsync("session-2", TestContext.Current.CancellationToken);
 
         // Assert
         result1!.TotalThinkingTokens.Should().Be(100);
@@ -145,8 +145,8 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("dist-session-1");
 
         // Act
-        await store.SetAsync("dist-session-1", state);
-        var result = await store.GetAsync("dist-session-1");
+        await store.SetAsync("dist-session-1", state, TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("dist-session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -170,8 +170,8 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("prefixed-session");
 
         // Act
-        await store.SetAsync("prefixed-session", state);
-        var result = await store.GetAsync("prefixed-session");
+        await store.SetAsync("prefixed-session", state, TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("prefixed-session", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -194,8 +194,8 @@ public class StateStorageIntegrationTests
         var state = CreateTestState("expiring-session");
 
         // Act
-        await store.SetAsync("expiring-session", state);
-        var result = await store.GetAsync("expiring-session");
+        await store.SetAsync("expiring-session", state, TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("expiring-session", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -213,11 +213,11 @@ public class StateStorageIntegrationTests
         var store = services.GetRequiredService<IThinkingStateStore>();
         var state = CreateTestState("dist-remove");
 
-        await store.SetAsync("dist-remove", state);
+        await store.SetAsync("dist-remove", state, TestContext.Current.CancellationToken);
 
         // Act
-        await store.RemoveAsync("dist-remove");
-        var result = await store.GetAsync("dist-remove");
+        await store.RemoveAsync("dist-remove", TestContext.Current.CancellationToken);
+        var result = await store.GetAsync("dist-remove", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -240,8 +240,7 @@ public class StateStorageIntegrationTests
         var healthCheck = services.GetRequiredService<ThinkingStateStoreHealthCheck>();
 
         // Act
-        var result = await healthCheck.CheckHealthAsync(
-            new Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext());
+        var result = await healthCheck.CheckHealthAsync(new Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext(), TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy);

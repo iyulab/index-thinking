@@ -50,7 +50,7 @@ public class ThinkingChatClientTests : IDisposable
             .Returns(Task.FromResult(turnResult));
 
         // Act
-        var response = await _client.GetResponseAsync(messages);
+        var response = await _client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -75,7 +75,7 @@ public class ThinkingChatClientTests : IDisposable
             .Returns(Task.FromResult(turnResult));
 
         // Act
-        var response = await _client.GetResponseAsync(messages);
+        var response = await _client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         var thinking = response.GetThinkingContent();
@@ -103,7 +103,7 @@ public class ThinkingChatClientTests : IDisposable
             .Returns(Task.FromResult(turnResult));
 
         // Act
-        var response = await _client.GetResponseAsync(messages);
+        var response = await _client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         var returnedMetrics = response.GetTurnMetrics();
@@ -128,7 +128,7 @@ public class ThinkingChatClientTests : IDisposable
             .Returns(Task.FromResult(turnResult));
 
         // Act
-        var response = await _client.GetResponseAsync(messages);
+        var response = await _client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         var result = response.GetTurnResult();
@@ -156,7 +156,7 @@ public class ThinkingChatClientTests : IDisposable
             });
 
         // Act
-        await _client.GetResponseAsync(messages);
+        await _client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         capturedContext.Should().NotBeNull();
@@ -190,7 +190,7 @@ public class ThinkingChatClientTests : IDisposable
             });
 
         // Act
-        await _client.GetResponseAsync(messages, options);
+        await _client.GetResponseAsync(messages, options, TestContext.Current.CancellationToken);
 
         // Assert
         capturedContext.Should().NotBeNull();
@@ -218,7 +218,7 @@ public class ThinkingChatClientTests : IDisposable
             });
 
         // Act
-        await _client.GetResponseAsync(messages, options);
+        await _client.GetResponseAsync(messages, options, TestContext.Current.CancellationToken);
 
         // Assert
         capturedContext.Should().NotBeNull();
@@ -284,7 +284,7 @@ public class ThinkingChatClientTests : IDisposable
 
         // Act
         var result = new List<ChatResponseUpdate>();
-        await foreach (var update in _client.GetStreamingResponseAsync(messages))
+        await foreach (var update in _client.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             result.Add(update);
         }
@@ -557,7 +557,7 @@ public class ThinkingChatClientContextIntegrationTests
         var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
 
         // Act
-        await client.GetResponseAsync(messages, chatOptions);
+        await client.GetResponseAsync(messages, chatOptions, TestContext.Current.CancellationToken);
 
         // Assert
         capturedMessages.Should().HaveCount(3);
@@ -598,7 +598,7 @@ public class ThinkingChatClientContextIntegrationTests
         var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
 
         // Act
-        await client.GetResponseAsync(messages, chatOptions);
+        await client.GetResponseAsync(messages, chatOptions, TestContext.Current.CancellationToken);
 
         // Assert
         _contextTracker.Received(1)
@@ -633,7 +633,7 @@ public class ThinkingChatClientContextIntegrationTests
             _contextInjector);
 
         // Act
-        await client.GetResponseAsync(messages);
+        await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         _contextTracker.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<ChatMessage>(), Arg.Any<ChatResponse>());
@@ -660,7 +660,7 @@ public class ThinkingChatClientContextIntegrationTests
             _turnManager);
 
         // Act
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -789,7 +789,7 @@ public class ThinkingChatClientInputValidationTests : IDisposable
 
         var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
 
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         response.Should().NotBeNull();
 
         client.Dispose();
@@ -815,7 +815,7 @@ public class ThinkingChatClientInputValidationTests : IDisposable
 
         var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
 
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         response.Should().NotBeNull();
 
         client.Dispose();
@@ -842,7 +842,7 @@ public class ThinkingChatClientInputValidationTests : IDisposable
 
         var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
 
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
         response.Should().NotBeNull();
 
         client.Dispose();

@@ -35,8 +35,8 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
         // Arrange
         Store.Count.Should().Be(0);
 
-        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" });
-        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" });
+        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" }, TestContext.Current.CancellationToken);
+        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" }, TestContext.Current.CancellationToken);
 
         // Assert
         Store.Count.Should().Be(2);
@@ -46,16 +46,16 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
     public async Task Clear_ShouldRemoveAllStates()
     {
         // Arrange
-        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" });
-        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" });
+        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" }, TestContext.Current.CancellationToken);
+        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" }, TestContext.Current.CancellationToken);
 
         // Act
         Store.Clear();
 
         // Assert
         Store.Count.Should().Be(0);
-        (await Store.ExistsAsync("s1")).Should().BeFalse();
-        (await Store.ExistsAsync("s2")).Should().BeFalse();
+        (await Store.ExistsAsync("s1", TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await Store.ExistsAsync("s2", TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
     [Fact]
@@ -93,8 +93,8 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
         };
 
         // Act
-        await Store.SetAsync("session-timestamps", state);
-        var result = await Store.GetAsync("session-timestamps");
+        await Store.SetAsync("session-timestamps", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-timestamps", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -113,8 +113,8 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
         };
 
         // Act
-        await Store.SetAsync("session-null-model", state);
-        var result = await Store.GetAsync("session-null-model");
+        await Store.SetAsync("session-null-model", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-null-model", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -132,8 +132,8 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
         };
 
         // Act
-        await Store.SetAsync("session-null-reasoning", state);
-        var result = await Store.GetAsync("session-null-reasoning");
+        await Store.SetAsync("session-null-reasoning", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-null-reasoning", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -158,8 +158,8 @@ public class SqliteThinkingStateStoreTests : ThinkingStateStoreTestsBase<SqliteT
         };
 
         // Act
-        await Store.SetAsync("session-large-data", state);
-        var result = await Store.GetAsync("session-large-data");
+        await Store.SetAsync("session-large-data", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-large-data", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -275,7 +275,7 @@ public class SqliteThinkingStateStoreFileTests : IDisposable
     public async Task DatabaseFile_ShouldBeCreated()
     {
         // Act - trigger initialization
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
 
         // Assert
         File.Exists(_dbPath).Should().BeTrue();
@@ -289,11 +289,11 @@ public class SqliteThinkingStateStoreFileTests : IDisposable
         {
             SessionId = "session-1",
             TotalThinkingTokens = 999
-        });
+        }, TestContext.Current.CancellationToken);
 
         // Act - create new instance with same database
         using var newStore = new SqliteThinkingStateStore($"Data Source={_dbPath}");
-        var result = await newStore.GetAsync("session-1");
+        var result = await newStore.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();

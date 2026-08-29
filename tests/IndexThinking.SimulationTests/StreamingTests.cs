@@ -4,7 +4,6 @@ using IndexThinking.Client;
 using IndexThinking.SimulationTests.Fixtures;
 using Microsoft.Extensions.AI;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace IndexThinking.SimulationTests;
 

@@ -42,7 +42,7 @@ public class ThinkingChatClientPipelineTests
         };
 
         // Act
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -82,7 +82,7 @@ public class ThinkingChatClientPipelineTests
         };
 
         // Act
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -127,14 +127,10 @@ public class ThinkingChatClientPipelineTests
         var sessionOptions = ThinkingChatClientExtensions.WithSession("test-session-123");
 
         // Act - First request
-        var response1 = await client.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, "Hello")],
-            sessionOptions);
+        var response1 = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hello")], sessionOptions, TestContext.Current.CancellationToken);
 
         // Act - Second request
-        var response2 = await client.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, "How are you?")],
-            sessionOptions);
+        var response2 = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "How are you?")], sessionOptions, TestContext.Current.CancellationToken);
 
         // Assert
         response1.Should().NotBeNull();
@@ -167,7 +163,7 @@ public class ThinkingChatClientPipelineTests
         };
 
         // Act
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -231,7 +227,7 @@ public class ThinkingChatClientPipelineTests
         var options = new ChatOptions { ModelId = "gpt-4o" };
 
         // Act
-        var response = await client.GetResponseAsync(messages, options);
+        var response = await client.GetResponseAsync(messages, options, TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();
@@ -275,7 +271,7 @@ public class ThinkingChatClientPipelineTests
         };
 
         // Act
-        var response = await client.GetResponseAsync(messages);
+        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         response.Should().NotBeNull();

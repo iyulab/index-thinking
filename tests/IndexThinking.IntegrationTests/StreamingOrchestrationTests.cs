@@ -41,7 +41,7 @@ public class StreamingOrchestrationTests
 
         // Act
         var updates = new List<ChatResponseUpdate>();
-        await foreach (var update in client.GetStreamingResponseAsync(messages))
+        await foreach (var update in client.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -89,7 +89,7 @@ public class StreamingOrchestrationTests
 
         // Act
         var updates = new List<ChatResponseUpdate>();
-        await foreach (var update in client.GetStreamingResponseAsync(messages))
+        await foreach (var update in client.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }
@@ -136,14 +136,10 @@ public class StreamingOrchestrationTests
         var sessionOptions = ThinkingChatClientExtensions.WithSession("streaming-session-1");
 
         // Act - First streaming request
-        await foreach (var _ in client.GetStreamingResponseAsync(
-            [new ChatMessage(ChatRole.User, "Hello via stream")],
-            sessionOptions)) { }
+        await foreach (var _ in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Hello via stream")], sessionOptions, TestContext.Current.CancellationToken)) { }
 
         // Act - Second streaming request
-        await foreach (var _ in client.GetStreamingResponseAsync(
-            [new ChatMessage(ChatRole.User, "Second message")],
-            sessionOptions)) { }
+        await foreach (var _ in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Second message")], sessionOptions, TestContext.Current.CancellationToken)) { }
 
         // Assert - Context should track both turns
         var context = contextTracker.GetContext("streaming-session-1");
@@ -196,7 +192,7 @@ public class StreamingOrchestrationTests
 
         // Act
         var textParts = new List<string>();
-        await foreach (var update in client.GetStreamingResponseAsync(messages))
+        await foreach (var update in client.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             if (update.Text is not null)
             {
@@ -238,7 +234,7 @@ public class StreamingOrchestrationTests
 
         // Act - should not throw
         var updates = new List<ChatResponseUpdate>();
-        await foreach (var update in client.GetStreamingResponseAsync(messages))
+        await foreach (var update in client.GetStreamingResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken))
         {
             updates.Add(update);
         }

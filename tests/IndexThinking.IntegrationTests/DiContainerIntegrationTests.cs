@@ -225,7 +225,7 @@ public class DiContainerIntegrationTests
             .UseIndexThinking()
             .Build(services);
 
-        var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hi")]);
+        var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hi")], cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         client.Should().NotBeNull();

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using DotNetEnv;
 using Xunit;
 
@@ -29,7 +30,10 @@ public class SimulationFactAttribute : FactAttribute
         return false;
     });
 
-    public SimulationFactAttribute()
+    public SimulationFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         // Force env loading
         _ = _envLoaded.Value;
@@ -41,7 +45,10 @@ public class SimulationFactAttribute : FactAttribute
 /// </summary>
 public sealed class GpuStackFactAttribute : SimulationFactAttribute
 {
-    public GpuStackFactAttribute()
+    public GpuStackFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_URL")) ||
             string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_APIKEY")))
@@ -56,7 +63,10 @@ public sealed class GpuStackFactAttribute : SimulationFactAttribute
 /// </summary>
 public sealed class OpenAIFactAttribute : SimulationFactAttribute
 {
-    public OpenAIFactAttribute()
+    public OpenAIFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OPENAI_API_KEY")))
         {
@@ -70,7 +80,10 @@ public sealed class OpenAIFactAttribute : SimulationFactAttribute
 /// </summary>
 public sealed class AnthropicFactAttribute : SimulationFactAttribute
 {
-    public AnthropicFactAttribute()
+    public AnthropicFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")))
         {
@@ -84,7 +97,10 @@ public sealed class AnthropicFactAttribute : SimulationFactAttribute
 /// </summary>
 public sealed class GoogleFactAttribute : SimulationFactAttribute
 {
-    public GoogleFactAttribute()
+    public GoogleFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GOOGLE_API_KEY")))
         {
@@ -98,7 +114,10 @@ public sealed class GoogleFactAttribute : SimulationFactAttribute
 /// </summary>
 public sealed class AnyProviderFactAttribute : SimulationFactAttribute
 {
-    public AnyProviderFactAttribute()
+    public AnyProviderFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         var hasGpuStack = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_URL")) &&
                           !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GPUSTACK_APIKEY"));
@@ -137,7 +156,10 @@ public sealed class SimulationTheoryAttribute : TheoryAttribute
         return false;
     });
 
-    public SimulationTheoryAttribute()
+    public SimulationTheoryAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         _ = _envLoaded.Value;
     }

@@ -39,7 +39,7 @@ public class ThinkingStateStoreHealthCheckTests
         };
 
         // Act
-        var result = await healthCheck.CheckHealthAsync(context);
+        var result = await healthCheck.CheckHealthAsync(context, TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(HealthStatus.Healthy);
@@ -63,7 +63,7 @@ public class ThinkingStateStoreHealthCheckTests
         };
 
         // Act
-        var result = await healthCheck.CheckHealthAsync(context);
+        var result = await healthCheck.CheckHealthAsync(context, TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(HealthStatus.Unhealthy);
@@ -97,7 +97,7 @@ public class ThinkingStateStoreHealthCheckTests
         };
 
         // Act
-        var result = await healthCheck.CheckHealthAsync(context);
+        var result = await healthCheck.CheckHealthAsync(context, TestContext.Current.CancellationToken);
 
         // Assert
         result.Status.Should().Be(HealthStatus.Degraded);
@@ -130,7 +130,7 @@ public class ThinkingStateStoreHealthCheckTests
         };
 
         // Act
-        await healthCheck.CheckHealthAsync(context);
+        await healthCheck.CheckHealthAsync(context, TestContext.Current.CancellationToken);
 
         // Assert
         capturedSessionId.Should().Be("__custom_test__");
@@ -152,7 +152,7 @@ public class ThinkingStateStoreHealthCheckTests
         };
 
         // Act
-        var result = await healthCheck.CheckHealthAsync(context);
+        var result = await healthCheck.CheckHealthAsync(context, TestContext.Current.CancellationToken);
 
         // Assert
         result.Data.Should().ContainKey("session_exists");

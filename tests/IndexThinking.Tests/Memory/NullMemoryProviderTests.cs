@@ -31,7 +31,7 @@ public class NullMemoryProviderTests
         var provider = NullMemoryProvider.Instance;
 
         // Act
-        var result = await provider.RecallAsync("user-1", "session-1", "test query");
+        var result = await provider.RecallAsync("user-1", "session-1", "test query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.Query.Should().Be("test query");
@@ -49,7 +49,7 @@ public class NullMemoryProviderTests
         var provider = NullMemoryProvider.Instance;
 
         // Act
-        var result = await provider.RecallAsync("user-1", null, "test query");
+        var result = await provider.RecallAsync("user-1", null, "test query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.HasMemories.Should().BeFalse();
@@ -120,7 +120,7 @@ public class NullMemoryProviderTests
         };
 
         // Act & Assert - Should complete without throwing
-        await provider.RememberAsync("user-1", "session-1", memories);
+        await provider.RememberAsync("user-1", "session-1", memories, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class NullMemoryProviderTests
         var provider = NullMemoryProvider.Instance;
 
         // Act & Assert
-        await provider.RememberAsync("user-1", null, []);
+        await provider.RememberAsync("user-1", null, [], TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class NullMemoryProviderTests
         };
 
         // Act & Assert
-        await provider.RememberAsync("user-1", null, memories);
+        await provider.RememberAsync("user-1", null, memories, TestContext.Current.CancellationToken);
     }
 
     #endregion

@@ -16,19 +16,20 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
 
     protected abstract TStore CreateStore();
 
-    public virtual Task InitializeAsync()
+    public virtual ValueTask InitializeAsync()
     {
         Store = CreateStore();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public virtual Task DisposeAsync()
+    public virtual ValueTask DisposeAsync()
     {
         if (Store is IDisposable disposable)
         {
             disposable.Dispose();
         }
-        return Task.CompletedTask;
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
     }
 
     #region Common Tests
@@ -37,7 +38,7 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
     public async Task GetAsync_WhenNotExists_ShouldReturnNull()
     {
         // Act
-        var result = await Store.GetAsync("non-existent");
+        var result = await Store.GetAsync("non-existent", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -50,8 +51,8 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
         var state = CreateTestState("session-1");
 
         // Act
-        await Store.SetAsync("session-1", state);
-        var result = await Store.GetAsync("session-1");
+        await Store.SetAsync("session-1", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -66,9 +67,9 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
         var updated = CreateTestState("session-1", thinkingTokens: 200);
 
         // Act
-        await Store.SetAsync("session-1", original);
-        await Store.SetAsync("session-1", updated);
-        var result = await Store.GetAsync("session-1");
+        await Store.SetAsync("session-1", original, TestContext.Current.CancellationToken);
+        await Store.SetAsync("session-1", updated, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -80,11 +81,11 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
     {
         // Arrange
         var state = CreateTestState("session-1");
-        await Store.SetAsync("session-1", state);
+        await Store.SetAsync("session-1", state, TestContext.Current.CancellationToken);
 
         // Act
-        await Store.RemoveAsync("session-1");
-        var result = await Store.GetAsync("session-1");
+        await Store.RemoveAsync("session-1", TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -105,10 +106,10 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
     {
         // Arrange
         var state = CreateTestState("session-1");
-        await Store.SetAsync("session-1", state);
+        await Store.SetAsync("session-1", state, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await Store.ExistsAsync("session-1");
+        var result = await Store.ExistsAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeTrue();
@@ -118,7 +119,7 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
     public async Task ExistsAsync_WhenNotExists_ShouldReturnFalse()
     {
         // Act
-        var result = await Store.ExistsAsync("non-existent");
+        var result = await Store.ExistsAsync("non-existent", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeFalse();
@@ -185,8 +186,8 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
         };
 
         // Act
-        await Store.SetAsync("session-with-reasoning", state);
-        var result = await Store.GetAsync("session-with-reasoning");
+        await Store.SetAsync("session-with-reasoning", state, TestContext.Current.CancellationToken);
+        var result = await Store.GetAsync("session-with-reasoning", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -208,16 +209,16 @@ public abstract class ThinkingStateStoreTestsBase<TStore> : IAsyncLifetime
         var state3 = CreateTestState("session-3", thinkingTokens: 300);
 
         // Act
-        await Store.SetAsync("session-1", state1);
-        await Store.SetAsync("session-2", state2);
-        await Store.SetAsync("session-3", state3);
+        await Store.SetAsync("session-1", state1, TestContext.Current.CancellationToken);
+        await Store.SetAsync("session-2", state2, TestContext.Current.CancellationToken);
+        await Store.SetAsync("session-3", state3, TestContext.Current.CancellationToken);
 
-        await Store.RemoveAsync("session-2");
+        await Store.RemoveAsync("session-2", TestContext.Current.CancellationToken);
 
         // Assert
-        (await Store.GetAsync("session-1"))!.TotalThinkingTokens.Should().Be(100);
-        (await Store.GetAsync("session-2")).Should().BeNull();
-        (await Store.GetAsync("session-3"))!.TotalThinkingTokens.Should().Be(300);
+        (await Store.GetAsync("session-1", TestContext.Current.CancellationToken))!.TotalThinkingTokens.Should().Be(100);
+        (await Store.GetAsync("session-2", TestContext.Current.CancellationToken)).Should().BeNull();
+        (await Store.GetAsync("session-3", TestContext.Current.CancellationToken))!.TotalThinkingTokens.Should().Be(300);
     }
 
     #endregion

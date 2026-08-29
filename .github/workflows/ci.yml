@@ -57,9 +57,12 @@ jobs:
           dotnet build tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-restore --configuration Release
 
       - name: Test
+        # --report-trx/--report-trx-filename and --hangdump/--hangdump-timeout are MTP's
+        # equivalents of VSTest's --logger trx and --blame-hang (native MTP mode via global.json
+        # needs no -- separator before these flags).
         run: |
-          dotnet test tests/IndexThinking.Tests/IndexThinking.Tests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --blame-hang --blame-hang-timeout 5m
-          dotnet test tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --blame-hang --blame-hang-timeout 5m
+          dotnet test tests/IndexThinking.Tests/IndexThinking.Tests.csproj --no-build --configuration Release --verbosity normal --report-trx --report-trx-filename test-results.trx --hangdump --hangdump-timeout 5m
+          dotnet test tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj --no-build --configuration Release --verbosity normal --report-trx --report-trx-filename test-results.trx --hangdump --hangdump-timeout 5m
 
 
   publish:

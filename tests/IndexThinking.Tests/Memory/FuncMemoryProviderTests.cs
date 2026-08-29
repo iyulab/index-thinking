@@ -47,7 +47,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        await provider.RecallAsync("user-1", "session-1", "test query", 15);
+        await provider.RecallAsync("user-1", "session-1", "test query", 15, TestContext.Current.CancellationToken);
 
         // Assert
         called.Should().BeTrue();
@@ -70,7 +70,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        var result = await provider.RecallAsync("user-1", null, "query");
+        var result = await provider.RecallAsync("user-1", null, "query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.UserMemories.Should().HaveCount(2);
@@ -94,7 +94,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        var result = await provider.RecallAsync("user-1", "session-1", "query");
+        var result = await provider.RecallAsync("user-1", "session-1", "query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.SessionMemories.Should().HaveCount(1);
@@ -116,7 +116,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        var result = await provider.RecallAsync("user-1", "session-1", "query");
+        var result = await provider.RecallAsync("user-1", "session-1", "query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.TopicMemories.Should().HaveCount(1);
@@ -140,7 +140,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        var result = await provider.RecallAsync("user-1", "session-1", "query");
+        var result = await provider.RecallAsync("user-1", "session-1", "query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.Memories.Should().HaveCount(3);
@@ -158,7 +158,7 @@ public class FuncMemoryProviderTests
         });
 
         // Act
-        var result = await provider.RecallAsync("user-1", null, "my query");
+        var result = await provider.RecallAsync("user-1", null, "my query", cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         result.Query.Should().Be("my query");
@@ -196,7 +196,7 @@ public class FuncMemoryProviderTests
         };
 
         // Act & Assert - Should not throw
-        await provider.RememberAsync("user-1", "session-1", memories);
+        await provider.RememberAsync("user-1", "session-1", memories, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -226,7 +226,7 @@ public class FuncMemoryProviderTests
         };
 
         // Act
-        await provider.RememberAsync("user-1", "session-1", memoriesToStore);
+        await provider.RememberAsync("user-1", "session-1", memoriesToStore, TestContext.Current.CancellationToken);
 
         // Assert
         called.Should().BeTrue();
@@ -270,7 +270,7 @@ public class FuncMemoryProviderTests
 
         // Act & Assert
         await Assert.ThrowsAnyAsync<ArgumentException>(() =>
-            provider.RememberAsync(null!, null, []));
+            provider.RememberAsync(null!, null, [], TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -283,7 +283,7 @@ public class FuncMemoryProviderTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() =>
-            provider.RememberAsync("user-1", null, null!));
+            provider.RememberAsync("user-1", null, null!, TestContext.Current.CancellationToken));
     }
 
     #endregion

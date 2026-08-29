@@ -23,8 +23,8 @@ public class InMemoryThinkingStateStoreTests : ThinkingStateStoreTestsBase<InMem
         // Arrange
         Store.Count.Should().Be(0);
 
-        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" });
-        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" });
+        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" }, TestContext.Current.CancellationToken);
+        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" }, TestContext.Current.CancellationToken);
 
         // Assert
         Store.Count.Should().Be(2);
@@ -34,16 +34,16 @@ public class InMemoryThinkingStateStoreTests : ThinkingStateStoreTestsBase<InMem
     public async Task Clear_ShouldRemoveAllStates()
     {
         // Arrange
-        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" });
-        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" });
+        await Store.SetAsync("s1", new ThinkingState { SessionId = "s1" }, TestContext.Current.CancellationToken);
+        await Store.SetAsync("s2", new ThinkingState { SessionId = "s2" }, TestContext.Current.CancellationToken);
 
         // Act
         Store.Clear();
 
         // Assert
         Store.Count.Should().Be(0);
-        (await Store.ExistsAsync("s1")).Should().BeFalse();
-        (await Store.ExistsAsync("s2")).Should().BeFalse();
+        (await Store.ExistsAsync("s1", TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await Store.ExistsAsync("s2", TestContext.Current.CancellationToken)).Should().BeFalse();
     }
 
     [Fact]
@@ -58,8 +58,8 @@ public class InMemoryThinkingStateStoreTests : ThinkingStateStoreTestsBase<InMem
         {
             tasks.Add(Task.Run(async () =>
             {
-                await Store.SetAsync(sessionId, new ThinkingState { SessionId = sessionId });
-            }));
+                await Store.SetAsync(sessionId, new ThinkingState { SessionId = sessionId }, TestContext.Current.CancellationToken);
+            }, TestContext.Current.CancellationToken));
         }
         await Task.WhenAll(tasks);
 
@@ -69,7 +69,7 @@ public class InMemoryThinkingStateStoreTests : ThinkingStateStoreTestsBase<InMem
         // Verify all can be read
         foreach (var sessionId in sessionIds)
         {
-            var result = await Store.GetAsync(sessionId);
+            var result = await Store.GetAsync(sessionId, TestContext.Current.CancellationToken);
             result.Should().NotBeNull();
             result!.SessionId.Should().Be(sessionId);
         }
@@ -105,13 +105,13 @@ public class InMemoryThinkingStateStoreWithTtlTests : IDisposable
     public async Task GetAsync_ExpiredEntry_ShouldReturnNull()
     {
         // Arrange
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
 
         // Wait for expiration
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _store.GetAsync("session-1");
+        var result = await _store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeNull();
@@ -121,13 +121,13 @@ public class InMemoryThinkingStateStoreWithTtlTests : IDisposable
     public async Task ExistsAsync_ExpiredEntry_ShouldReturnFalse()
     {
         // Arrange
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
 
         // Wait for expiration
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
         // Act
-        var result = await _store.ExistsAsync("session-1");
+        var result = await _store.ExistsAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().BeFalse();
@@ -137,10 +137,10 @@ public class InMemoryThinkingStateStoreWithTtlTests : IDisposable
     public async Task GetAsync_NotExpired_ShouldReturnState()
     {
         // Arrange
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
 
         // Act immediately (before expiration)
-        var result = await _store.GetAsync("session-1");
+        var result = await _store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert
         result.Should().NotBeNull();
@@ -151,13 +151,13 @@ public class InMemoryThinkingStateStoreWithTtlTests : IDisposable
     public async Task CleanupExpired_ShouldRemoveExpiredEntries()
     {
         // Arrange
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
-        await _store.SetAsync("session-2", new ThinkingState { SessionId = "session-2" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
+        await _store.SetAsync("session-2", new ThinkingState { SessionId = "session-2" }, TestContext.Current.CancellationToken);
 
         _store.Count.Should().Be(2);
 
         // Wait for expiration
-        await Task.Delay(150);
+        await Task.Delay(150, TestContext.Current.CancellationToken);
 
         // Act
         var removed = _store.CleanupExpired();
@@ -196,19 +196,19 @@ public class InMemoryThinkingStateStoreSlidingExpirationTests : IDisposable
     public async Task GetAsync_WithSlidingExpiration_ShouldExtendTtl()
     {
         // Arrange
-        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" });
+        await _store.SetAsync("session-1", new ThinkingState { SessionId = "session-1" }, TestContext.Current.CancellationToken);
 
         // Access multiple times before expiration to extend TTL
         for (int i = 0; i < 3; i++)
         {
-            await Task.Delay(300); // Less than 2000ms TTL
-            var result = await _store.GetAsync("session-1");
+            await Task.Delay(300, TestContext.Current.CancellationToken); // Less than 2000ms TTL
+            var result = await _store.GetAsync("session-1", TestContext.Current.CancellationToken);
             result.Should().NotBeNull($"iteration {i}");
         }
 
         // Wait well under TTL again
-        await Task.Delay(300);
-        var finalResult = await _store.GetAsync("session-1");
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+        var finalResult = await _store.GetAsync("session-1", TestContext.Current.CancellationToken);
 
         // Assert - should still exist due to sliding expiration
         finalResult.Should().NotBeNull();

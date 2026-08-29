@@ -77,7 +77,7 @@ public class DistributedCacheThinkingStateStoreSpecificTests
             SessionId = "refresh-test"
         };
 
-        await store.SetAsync("refresh-test", state);
+        await store.SetAsync("refresh-test", state, TestContext.Current.CancellationToken);
 
         // Act
         var refreshAction = () => store.RefreshAsync("refresh-test");
