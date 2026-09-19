@@ -40,10 +40,9 @@ public class ThinkingChatClientOptions
     private int? _maxContextTokens;
 
     /// <summary>
-    /// Maximum context tokens for the model. When set, propagates to both
-    /// <see cref="ContinuationConfig.MaxContextTokens"/> and
-    /// <see cref="ContextInjectorOptions.MaxContextTokens"/>.
-    /// Default: null (uses individual component settings).
+    /// Maximum context tokens for the model. Setting it sets <see cref="ContinuationConfig.MaxContextTokens"/> on
+    /// <see cref="DefaultContinuation"/>. The context injector takes its own <see cref="ContextInjectorOptions"/> where it
+    /// is constructed (<c>AddIndexThinkingContext</c>). Default: null (the continuation's own setting).
     /// </summary>
     public int? MaxContextTokens
     {
@@ -54,7 +53,6 @@ public class ThinkingChatClientOptions
             if (value.HasValue)
             {
                 DefaultContinuation = DefaultContinuation with { MaxContextTokens = value.Value };
-                ContextInjectorOptions.MaxContextTokens = value.Value;
             }
         }
     }
@@ -76,22 +74,6 @@ public class ThinkingChatClientOptions
     /// Default: true.
     /// </summary>
     public bool EnableContextInjection { get; set; } = true;
-
-    /// <summary>
-    /// Maximum number of previous turns to inject as context.
-    /// Default: 5 turns.
-    /// </summary>
-    public int MaxContextTurns { get; set; } = 5;
-
-    /// <summary>
-    /// Context tracker options for session management.
-    /// </summary>
-    public ContextTrackerOptions ContextTrackerOptions { get; set; } = new();
-
-    /// <summary>
-    /// Context injector options for message injection.
-    /// </summary>
-    public ContextInjectorOptions ContextInjectorOptions { get; set; } = new();
 
     // ========================================
     // Reasoning Activation Options (v0.12.0)

@@ -677,9 +677,6 @@ public class ThinkingChatClientOptionsContextTests
         // Assert
         options.EnableContextTracking.Should().BeTrue();
         options.EnableContextInjection.Should().BeTrue();
-        options.MaxContextTurns.Should().Be(5);
-        options.ContextTrackerOptions.Should().NotBeNull();
-        options.ContextInjectorOptions.Should().NotBeNull();
     }
 
     [Fact]
@@ -690,21 +687,15 @@ public class ThinkingChatClientOptionsContextTests
         {
             EnableContextTracking = false,
             EnableContextInjection = false,
-            MaxContextTurns = 10,
-            ContextTrackerOptions = new ContextTrackerOptions { MaxTurns = 20 },
-            ContextInjectorOptions = new ContextInjectorOptions { MaxTurnsToInject = 3 }
         };
 
         // Assert
         options.EnableContextTracking.Should().BeFalse();
         options.EnableContextInjection.Should().BeFalse();
-        options.MaxContextTurns.Should().Be(10);
-        options.ContextTrackerOptions.MaxTurns.Should().Be(20);
-        options.ContextInjectorOptions.MaxTurnsToInject.Should().Be(3);
     }
 
     [Fact]
-    public void MaxContextTokens_PropagatesToContinuationAndInjector()
+    public void MaxContextTokens_PropagatesToContinuation()
     {
         var options = new ThinkingChatClientOptions
         {
@@ -712,7 +703,6 @@ public class ThinkingChatClientOptionsContextTests
         };
 
         options.DefaultContinuation.MaxContextTokens.Should().Be(32000);
-        options.ContextInjectorOptions.MaxContextTokens.Should().Be(32000);
     }
 
     [Fact]

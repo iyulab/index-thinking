@@ -30,4 +30,8 @@
     <ProjectReference Include="..\..\src\IndexThinking\IndexThinking.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Iyu.Conventions.Testing" />
+  </ItemGroup>
+
 </Project>

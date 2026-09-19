@@ -46,5 +46,7 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <!-- Source Link -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
+      <!-- Convention checks (options reachability) — iyulab conventions kit -->
+    <PackageVersion Include="Iyu.Conventions.Testing" Version="0.1.0" />
   </ItemGroup>
 </Project>

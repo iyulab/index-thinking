@@ -15,6 +15,15 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   never applied, so it looked like a per-turn cap and was not one; the options registered by `AddIndexThinkingAgents`
   were never read either. Migration: cap reasoning on the request (`ChatOptions.Reasoning`, `ChatOptions.MaxOutputTokens`);
   continuation limits are `ThinkingChatClientOptions.DefaultContinuation`; call `AddIndexThinkingAgents()` without arguments.
+- **Breaking: `ThinkingChatClientOptions.ContextTrackerOptions`, `ContextInjectorOptions` and `MaxContextTurns`.** The
+  client takes its tracker and injector as constructor arguments, each built with its own options, so these copies were
+  never read; `MaxContextTokens` no longer writes into the dead `ContextInjectorOptions` copy. Migration: pass the options
+  where the tracker and injector are built (`AddIndexThinkingContext(trackerOptions, injectorOptions)`).
+
+### Added
+
+- **An options roster test** (`Iyu.Conventions.Testing`): every public option must be read by the library, or be listed
+  with its reason.
 
 ## [0.21.2] - 2026-09-10
 
