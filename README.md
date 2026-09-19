@@ -12,7 +12,7 @@ IndexThinking handles the repetitive-but-hard parts of LLM integration:
 - **Truncation Recovery** - Auto-continue when responses hit token limits
 - **Reasoning Extraction** - Unified API for provider-specific thinking formats
 - **Context Tracking** - Session-aware conversation with sliding window
-- **Token Management** - Budget tracking and complexity estimation
+- **Token Management** - Token usage tracking (`IBudgetTracker`) and complexity estimation (`IComplexityEstimator`), reported in turn metrics — informational, not limits. To cap how much a model thinks, set it on the request: `ChatOptions.Reasoning` (effort) and `ChatOptions.MaxOutputTokens`; IndexThinking extracts the reasoning, it does not throttle it
 - **Content Recovery** - Repair truncated JSON/code blocks
 
 ## Scope

@@ -12,20 +12,9 @@ namespace IndexThinking.Client;
 public class ThinkingChatClientOptions
 {
     /// <summary>
-    /// Default budget configuration for all requests.
-    /// Can be overridden per-request via ChatOptions.
-    /// </summary>
-    public BudgetConfig DefaultBudget { get; set; } = new();
-
-    /// <summary>
     /// Default continuation configuration for handling truncated responses.
     /// </summary>
     public ContinuationConfig DefaultContinuation { get; set; } = ContinuationConfig.Default;
-
-    /// <summary>
-    /// Whether to automatically estimate task complexity.
-    /// </summary>
-    public bool AutoEstimateComplexity { get; set; } = true;
 
     /// <summary>
     /// Whether to include thinking content in the response metadata.

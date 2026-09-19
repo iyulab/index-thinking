@@ -39,11 +39,6 @@ public sealed record ThinkingContext
     public MemoryRecallContext? MemoryContext { get; init; }
 
     /// <summary>
-    /// Budget configuration for this turn.
-    /// </summary>
-    public BudgetConfig Budget { get; init; } = new();
-
-    /// <summary>
     /// Continuation configuration for handling truncated responses.
     /// </summary>
     public ContinuationConfig Continuation { get; init; } = ContinuationConfig.Default;
@@ -105,12 +100,6 @@ public sealed record ThinkingContext
     /// </summary>
     public ThinkingContext WithModel(string modelId) =>
         this with { ModelId = modelId };
-
-    /// <summary>
-    /// Creates a copy with the specified budget configuration.
-    /// </summary>
-    public ThinkingContext WithBudget(BudgetConfig budget) =>
-        this with { Budget = budget };
 
     /// <summary>
     /// Creates a copy with the specified cancellation token.

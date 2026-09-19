@@ -258,38 +258,6 @@ public class ServiceCollectionExtensionsTests
         provider.GetService<IComplexityEstimator>().Should().NotBeNull();
         provider.GetService<IBudgetTracker>().Should().NotBeNull();
         provider.GetService<IContinuationHandler>().Should().NotBeNull();
-        provider.GetService<AgentOptions>().Should().NotBeNull();
-    }
-
-    [Fact]
-    public void AddIndexThinkingAgents_WithOptions_AppliesConfiguration()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        var customBudget = new BudgetConfig
-        {
-            ThinkingBudget = 5000,
-            AnswerBudget = 2000
-        };
-
-        // Add required dependencies
-        services.AddSingleton(Substitute.For<ITruncationDetector>());
-        services.AddSingleton(Substitute.For<ITokenCounter>());
-        services.AddSingleton<IEnumerable<IReasoningParser>>(Array.Empty<IReasoningParser>());
-
-        // Act
-        services.AddIndexThinkingAgents(options =>
-        {
-            options.DefaultBudget = customBudget;
-            options.AutoEstimateComplexity = false;
-        });
-        var provider = services.BuildServiceProvider();
-        var resolvedOptions = provider.GetRequiredService<AgentOptions>();
-
-        // Assert
-        resolvedOptions.DefaultBudget.ThinkingBudget.Should().Be(5000);
-        resolvedOptions.DefaultBudget.AnswerBudget.Should().Be(2000);
-        resolvedOptions.AutoEstimateComplexity.Should().BeFalse();
     }
 
     [Fact]
@@ -321,27 +289,6 @@ public class ServiceCollectionExtensionsTests
 
         // Assert
         action.Should().Throw<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void AddIndexThinkingAgents_DefaultOptions_HasCorrectDefaults()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Add required dependencies
-        services.AddSingleton(Substitute.For<ITruncationDetector>());
-        services.AddSingleton(Substitute.For<ITokenCounter>());
-
-        // Act
-        services.AddIndexThinkingAgents();
-        var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<AgentOptions>();
-
-        // Assert
-        options.AutoEstimateComplexity.Should().BeTrue();
-        options.DefaultBudget.Should().NotBeNull();
-        options.DefaultContinuation.Should().NotBeNull();
     }
 
     [Fact]

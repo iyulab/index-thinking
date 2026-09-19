@@ -132,11 +132,12 @@ public static class ServiceCollectionExtensions
     /// Adds IndexThinking turn management services.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="configure">Optional configuration action for agent options.</param>
     /// <returns>The service collection for chaining.</returns>
-    public static IServiceCollection AddIndexThinkingAgents(
-        this IServiceCollection services,
-        Action<AgentOptions>? configure = null)
+    /// <remarks>
+    /// Continuation and context settings live on <see cref="Client.ThinkingChatClientOptions"/>, the options of the client
+    /// that runs the turn. (An <c>AgentOptions</c> registered here used to accept them too, and nothing read it.)
+    /// </remarks>
+    public static IServiceCollection AddIndexThinkingAgents(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -153,18 +154,6 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IBudgetTracker, DefaultBudgetTracker>();
         services.TryAddSingleton<IContinuationHandler, DefaultContinuationHandler>();
         services.TryAddSingleton<IThinkingTurnManager, DefaultThinkingTurnManager>();
-
-        // Configure options
-        if (configure is not null)
-        {
-            var options = new AgentOptions();
-            configure(options);
-            services.TryAddSingleton(options);
-        }
-        else
-        {
-            services.TryAddSingleton(new AgentOptions());
-        }
 
         return services;
     }

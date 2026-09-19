@@ -337,7 +337,6 @@ public class ThinkingChatClientOptionsTests
         var options = new ThinkingChatClientOptions();
 
         // Assert
-        options.AutoEstimateComplexity.Should().BeTrue();
         options.IncludeThinkingInMetadata.Should().BeTrue();
         options.IncludeMetricsInMetadata.Should().BeTrue();
         options.SessionIdKey.Should().Be("IndexThinking.SessionId");

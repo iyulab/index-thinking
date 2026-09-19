@@ -94,28 +94,6 @@ public sealed class DefaultBudgetTracker : IBudgetTracker
     }
 
     /// <inheritdoc />
-    public bool IsThinkingBudgetExceeded(BudgetConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        lock (_lock)
-        {
-            return _thinkingTokens > config.ThinkingBudget;
-        }
-    }
-
-    /// <inheritdoc />
-    public bool IsAnswerBudgetExceeded(BudgetConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        lock (_lock)
-        {
-            return _outputTokens > config.AnswerBudget;
-        }
-    }
-
-    /// <inheritdoc />
     public void Reset()
     {
         lock (_lock)

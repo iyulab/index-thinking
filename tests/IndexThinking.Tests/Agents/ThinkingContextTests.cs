@@ -52,9 +52,6 @@ public class ThinkingContextTests
         var context = ThinkingContext.Create("session", [new(ChatRole.User, "Test")]);
 
         // Assert
-        Assert.NotNull(context.Budget);
-        Assert.Equal(4096, context.Budget.ThinkingBudget);
-        Assert.Equal(4096, context.Budget.AnswerBudget);
         Assert.NotNull(context.Continuation);
         Assert.Equal(5, context.Continuation.MaxContinuations);
         Assert.Null(context.EstimatedComplexity);
@@ -92,23 +89,6 @@ public class ThinkingContextTests
         Assert.NotSame(original, modified);
         Assert.Null(original.ModelId);
         Assert.Equal("gpt-4o", modified.ModelId);
-    }
-
-    [Fact]
-    public void WithBudget_ReturnsNewInstance()
-    {
-        // Arrange
-        var original = ThinkingContext.Create("session", [new(ChatRole.User, "Test")]);
-        var newBudget = new BudgetConfig { ThinkingBudget = 8192, AnswerBudget = 2048 };
-
-        // Act
-        var modified = original.WithBudget(newBudget);
-
-        // Assert
-        Assert.NotSame(original, modified);
-        Assert.Equal(4096, original.Budget.ThinkingBudget);
-        Assert.Equal(8192, modified.Budget.ThinkingBudget);
-        Assert.Equal(2048, modified.Budget.AnswerBudget);
     }
 
     [Fact]

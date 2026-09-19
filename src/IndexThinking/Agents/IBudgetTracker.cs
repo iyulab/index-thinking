@@ -35,20 +35,6 @@ public interface IBudgetTracker
     BudgetUsage GetUsage();
 
     /// <summary>
-    /// Checks if thinking budget is exceeded (advisory).
-    /// </summary>
-    /// <param name="config">The budget configuration.</param>
-    /// <returns>True if thinking tokens exceed the budget.</returns>
-    bool IsThinkingBudgetExceeded(BudgetConfig config);
-
-    /// <summary>
-    /// Checks if answer budget is exceeded (advisory).
-    /// </summary>
-    /// <param name="config">The budget configuration.</param>
-    /// <returns>True if output tokens exceed the budget.</returns>
-    bool IsAnswerBudgetExceeded(BudgetConfig config);
-
-    /// <summary>
     /// Resets the tracker for a new turn.
     /// </summary>
     void Reset();

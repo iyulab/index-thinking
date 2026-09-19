@@ -138,52 +138,6 @@ public class HeuristicComplexityEstimatorTests
     }
 
     [Fact]
-    public void GetRecommendedBudget_Simple_ReturnsSmallBudget()
-    {
-        // Act
-        var budget = _estimator.GetRecommendedBudget(TaskComplexity.Simple);
-
-        // Assert
-        Assert.Equal(1024, budget.ThinkingBudget);
-        Assert.Equal(2048, budget.AnswerBudget);
-        Assert.Equal(2, budget.MaxContinuations);
-    }
-
-    [Fact]
-    public void GetRecommendedBudget_Moderate_ReturnsModerateBudget()
-    {
-        // Act
-        var budget = _estimator.GetRecommendedBudget(TaskComplexity.Moderate);
-
-        // Assert
-        Assert.Equal(4096, budget.ThinkingBudget);
-        Assert.Equal(4096, budget.AnswerBudget);
-    }
-
-    [Fact]
-    public void GetRecommendedBudget_Complex_ReturnsLargeBudget()
-    {
-        // Act
-        var budget = _estimator.GetRecommendedBudget(TaskComplexity.Complex);
-
-        // Assert
-        Assert.Equal(8192, budget.ThinkingBudget);
-        Assert.Equal(5, budget.MaxContinuations);
-    }
-
-    [Fact]
-    public void GetRecommendedBudget_Research_ReturnsLargestBudget()
-    {
-        // Act
-        var budget = _estimator.GetRecommendedBudget(TaskComplexity.Research);
-
-        // Assert
-        Assert.Equal(16384, budget.ThinkingBudget);
-        Assert.Equal(8192, budget.AnswerBudget);
-        Assert.Equal(7, budget.MaxContinuations);
-    }
-
-    [Fact]
     public void Estimate_ImplementKeyword_ReturnsComplex()
     {
         // Arrange

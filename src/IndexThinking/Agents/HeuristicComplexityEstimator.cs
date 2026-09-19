@@ -34,35 +34,6 @@ public sealed partial class HeuristicComplexityEstimator : IComplexityEstimator
     private const int LongMessageTokens = 500;
     private const int CodeBlockBoost = 1;
 
-    // Budget configurations per complexity level
-    private static readonly BudgetConfig SimpleBudget = new()
-    {
-        ThinkingBudget = 1024,
-        AnswerBudget = 2048,
-        MaxContinuations = 2
-    };
-
-    private static readonly BudgetConfig ModerateBudget = new()
-    {
-        ThinkingBudget = 4096,
-        AnswerBudget = 4096,
-        MaxContinuations = 3
-    };
-
-    private static readonly BudgetConfig ComplexBudget = new()
-    {
-        ThinkingBudget = 8192,
-        AnswerBudget = 4096,
-        MaxContinuations = 5
-    };
-
-    private static readonly BudgetConfig ResearchBudget = new()
-    {
-        ThinkingBudget = 16384,
-        AnswerBudget = 8192,
-        MaxContinuations = 7
-    };
-
     /// <summary>
     /// Creates a new heuristic complexity estimator.
     /// </summary>
@@ -100,19 +71,6 @@ public sealed partial class HeuristicComplexityEstimator : IComplexityEstimator
             >= 2 => TaskComplexity.Complex,
             >= 1 => TaskComplexity.Moderate,
             _ => TaskComplexity.Simple
-        };
-    }
-
-    /// <inheritdoc />
-    public BudgetConfig GetRecommendedBudget(TaskComplexity complexity)
-    {
-        return complexity switch
-        {
-            TaskComplexity.Simple => SimpleBudget,
-            TaskComplexity.Moderate => ModerateBudget,
-            TaskComplexity.Complex => ComplexBudget,
-            TaskComplexity.Research => ResearchBudget,
-            _ => ModerateBudget
         };
     }
 

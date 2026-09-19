@@ -317,7 +317,6 @@ public class ThinkingChatClient : DelegatingChatClient
         CancellationToken cancellationToken)
     {
         var context = ThinkingContext.Create(sessionId, messages)
-            .WithBudget(_options.DefaultBudget)
             .WithCancellation(cancellationToken);
 
         context = context with { ReasoningActivated = reasoningActivated };

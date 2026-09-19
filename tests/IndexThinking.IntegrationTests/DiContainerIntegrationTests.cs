@@ -266,25 +266,4 @@ public class DiContainerIntegrationTests
         store.Should().BeOfType<DistributedCacheThinkingStateStore>();
     }
 
-    [Fact]
-    public void AddIndexThinkingAgents_WithOptions_AppliesConfiguration()
-    {
-        // Arrange
-        var services = new ServiceCollection()
-            .AddIndexThinkingAgents(options =>
-            {
-                options.AutoEstimateComplexity = false;
-                options.DefaultBudget = new Core.BudgetConfig
-                {
-                    ThinkingBudget = 8192,
-                    AnswerBudget = 4096
-                };
-            });
-
-        // Act
-        var provider = services.BuildServiceProvider();
-
-        // Assert
-        provider.GetService<IThinkingTurnManager>().Should().NotBeNull();
-    }
 }

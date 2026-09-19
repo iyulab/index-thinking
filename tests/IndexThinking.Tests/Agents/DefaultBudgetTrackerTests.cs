@@ -94,68 +94,6 @@ public class DefaultBudgetTrackerTests
     }
 
     [Fact]
-    public void IsThinkingBudgetExceeded_UnderBudget_ReturnsFalse()
-    {
-        // Arrange
-        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
-        var thinking = new ThinkingContent { Text = "Some thinking" };
-        _tracker.RecordResponse(CreateResponse("Response"), thinking);
-        var config = new BudgetConfig { ThinkingBudget = 200 };
-
-        // Act
-        var result = _tracker.IsThinkingBudgetExceeded(config);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void IsThinkingBudgetExceeded_OverBudget_ReturnsTrue()
-    {
-        // Arrange
-        _tokenCounter.Count(Arg.Any<string>()).Returns(500);
-        var thinking = new ThinkingContent { Text = "Long thinking process" };
-        _tracker.RecordResponse(CreateResponse("Response"), thinking);
-        var config = new BudgetConfig { ThinkingBudget = 100 };
-
-        // Act
-        var result = _tracker.IsThinkingBudgetExceeded(config);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void IsAnswerBudgetExceeded_UnderBudget_ReturnsFalse()
-    {
-        // Arrange
-        _tokenCounter.Count(Arg.Any<string>()).Returns(100);
-        _tracker.RecordResponse(CreateResponse("Short response"), null);
-        var config = new BudgetConfig { AnswerBudget = 200 };
-
-        // Act
-        var result = _tracker.IsAnswerBudgetExceeded(config);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void IsAnswerBudgetExceeded_OverBudget_ReturnsTrue()
-    {
-        // Arrange
-        _tokenCounter.Count(Arg.Any<string>()).Returns(500);
-        _tracker.RecordResponse(CreateResponse("Very long response"), null);
-        var config = new BudgetConfig { AnswerBudget = 100 };
-
-        // Act
-        var result = _tracker.IsAnswerBudgetExceeded(config);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
     public void Reset_ClearsAllCounters()
     {
         // Arrange
