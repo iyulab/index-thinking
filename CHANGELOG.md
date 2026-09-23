@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.22.1] - 2026-09-23
+
+### Fixed
+- **`TokenCounterChain.IsApproximate(modelId)` answers for the counter the chain uses for that model.** It fell through to
+  `ITokenCounter`'s default and returned `false` for every model — including the ones the chain routes to its approximate
+  fallback (a chain built for `claude-3` counts approximately and said it did not). A model no counter supports is
+  reported approximate.
+
 ## [0.22.0] - 2026-09-19
 
 ### Removed

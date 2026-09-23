@@ -71,6 +71,23 @@ public sealed class TokenCounterChain : IChatMessageTokenCounter
         return _counters.Any(c => c.SupportsModel(modelId));
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Answers for the counter the chain would use for <paramref name="modelId"/> (the first that supports it).
+    /// Before, this fell through to the interface default and said <c>false</c> even when the chain routed the
+    /// model to its approximate fallback. A model no counter supports is approximate by definition.
+    /// </remarks>
+    public bool IsApproximate(string modelId)
+    {
+        foreach (var counter in _counters)
+        {
+            if (counter.SupportsModel(modelId))
+                return counter.IsApproximate(modelId);
+        }
+
+        return true;
+    }
+
     /// <summary>
     /// Gets the current model ID, if set.
     /// </summary>
