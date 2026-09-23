@@ -23,7 +23,7 @@ public class OptionsReachabilityRosterTests
 
     // The provider request models under Parsers.Models are wire DTOs (serialized by reflection), not options.
     private static bool IsOptions(Type type) =>
-        OptionsTypes.NamedWith("Options", "Config")(type) && type.Namespace != "IndexThinking.Parsers.Models";
+        OptionsTypes.NamedWith("Options", "Config", "Settings")(type) && type.Namespace != "IndexThinking.Parsers.Models";
 
     [Fact]
     public void EveryPublicOption_IsRead() =>
