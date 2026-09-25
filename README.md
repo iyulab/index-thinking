@@ -14,6 +14,7 @@ IndexThinking handles the repetitive-but-hard parts of LLM integration:
 - **Context Tracking** - Session-aware conversation with sliding window
 - **Token Management** - Token usage tracking (`IBudgetTracker`) and complexity estimation (`IComplexityEstimator`), reported in turn metrics — informational, not limits. To cap how much a model thinks, set it on the request: `ChatOptions.Reasoning` (effort) and `ChatOptions.MaxOutputTokens`; IndexThinking extracts the reasoning, it does not throttle it
 - **Content Recovery** - Repair truncated JSON/code blocks
+- **Thinking State Stores** - `IThinkingStateStore` with an in-memory default (`AddIndexThinkingInMemoryStorage`) and a distributed-cache store in the core package; a persistent SQLite store is opt-in (below)
 
 ## Scope
 
@@ -26,6 +27,13 @@ IndexThinking manages a **single LLM turn**, not multi-step workflows.
 | Used BY orchestrators | Uses IndexThinking |
 
 **Token counting role boundary** — IndexThinking owns token *counting* (`ITokenCounter`, framework-neutral; `IChatMessageTokenCounter` for M.E.AI `ChatMessage` counting). Model *metadata* (context window, pricing) belongs to TokenMeter; combining the two into budget enforcement belongs to the consuming pipeline.
+
+## Packages
+
+| Package | Use |
+|---|---|
+| `IndexThinking` | Turn handling, reasoning extraction, token counting, in-memory and distributed-cache state stores |
+| `IndexThinking.Sqlite` | Persistent SQLite `IThinkingStateStore` — `services.AddIndexThinkingSqliteStorage("Data Source=thinking.db")`. Carries `Microsoft.Data.Sqlite` and the native `e_sqlite3`; the core package does not |
 
 ## Quick Start
 

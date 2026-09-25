@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.23.0] - Unreleased
+
+### Changed
+
+- **Breaking: the SQLite state store moved to a new package, `IndexThinking.Sqlite`.** `SqliteThinkingStateStore`,
+  `SqliteStateStoreOptions` and `AddIndexThinkingSqliteStorage` keep their names and namespaces; `IndexThinking` no
+  longer depends on `Microsoft.Data.Sqlite` or `SQLitePCLRaw.bundle_e_sqlite3`, so a consumer that never persists
+  thinking state stops shipping the native `e_sqlite3` (about 2 MB on one RID, one copy per RID in a portable build).
+  Migration: add a package reference to `IndexThinking.Sqlite` if you call `AddIndexThinkingSqliteStorage` or use the
+  store directly.
+
 ## [0.22.1] - 2026-09-23
 
 ### Fixed

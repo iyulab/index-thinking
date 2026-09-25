@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>IndexThinking.Sqlite</PackageId>
+    <Description>SQLite-backed thinking state store for IndexThinking (persistent IThinkingStateStore).</Description>
+    <PackageTags>ai;llm;reasoning;thinking;memory;sqlite</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IndexThinking\IndexThinking.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <!-- Lifts the vulnerable SQLitePCLRaw 2.1.11 that Microsoft.Data.Sqlite drags in (GHSA-2m69-gcr7-jv3q). -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

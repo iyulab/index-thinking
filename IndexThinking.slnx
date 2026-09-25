@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/IndexThinking/IndexThinking.csproj" />
+    <Project Path="src/IndexThinking.Sqlite/IndexThinking.Sqlite.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/IndexThinking.IntegrationTests/IndexThinking.IntegrationTests.csproj" />

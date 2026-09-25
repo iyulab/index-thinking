@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IndexThinking\IndexThinking.csproj" />
+    <ProjectReference Include="..\..\src\IndexThinking.Sqlite\IndexThinking.Sqlite.csproj" />
   </ItemGroup>
 
   <ItemGroup>
