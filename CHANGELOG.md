@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.24.0] - Unreleased
+
+### Fixed
+- **A truncated stream is reported as truncated instead of being "continued" with itself.** On the streaming path the
+  continuation request returned the same aggregated response, so a stream cut off at the output limit was appended to
+  itself up to `MaxContinuations` + 1 times and that repeated text was what the conversation tracker recorded. The
+  caller already holds every chunk, so `GetStreamingResponseAsync` now reports the turn as `TurnResult.WasTruncated`
+  without continuing it or repairing its JSON/code blocks; what is recorded is what was streamed. Truncation recovery
+  (continuation and content repair) remains a non-streaming feature.
+
+### Changed
+- **Packages carry the license text.** Each `.nupkg` includes `LICENSE` next to the `MIT` expression.
+
 ## [0.23.1] - 2026-10-01
 
 ### Dependencies

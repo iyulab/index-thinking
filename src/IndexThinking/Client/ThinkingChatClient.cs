@@ -213,9 +213,28 @@ public class ThinkingChatClient : DelegatingChatClient
 
             var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
+            // The caller already has every chunk, so a truncated stream is reported (TurnResult.IsTruncated), not
+            // continued: there is no further request to send, and recovery would record text the caller never saw.
+            context = context with
+            {
+                Continuation = context.Continuation with
+                {
+                    MaxContinuations = 0,
+                    EnableJsonRecovery = false,
+                    EnableCodeBlockRecovery = false,
+                },
+            };
+
+            var served = false;
             var turnResult = await _turnManager.ProcessTurnAsync(
                 context,
-                (_, _) => Task.FromResult(aggregatedResponse));
+                (_, _) =>
+                {
+                    if (served)
+                        throw new InvalidOperationException("A streamed response is not continued; the stream has already ended.");
+                    served = true;
+                    return Task.FromResult(aggregatedResponse);
+                });
 
             // Track conversation if enabled
             TrackConversation(sessionId, messageList, turnResult.Response);

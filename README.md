@@ -9,7 +9,7 @@
 
 IndexThinking handles the repetitive-but-hard parts of LLM integration:
 
-- **Truncation Recovery** - Auto-continue when responses hit token limits
+- **Truncation Recovery** - Auto-continue when responses hit token limits (`GetResponseAsync`; a truncated stream is reported as `WasTruncated`)
 - **Reasoning Extraction** - Unified API for provider-specific thinking formats
 - **Context Tracking** - Session-aware conversation with sliding window
 - **Token Management** - Token usage tracking (`IBudgetTracker`) and complexity estimation (`IComplexityEstimator`), reported in turn metrics — informational, not limits. To cap how much a model thinks, set it on the request: `ChatOptions.Reasoning` (effort) and `ChatOptions.MaxOutputTokens`; IndexThinking extracts the reasoning, it does not throttle it
@@ -68,7 +68,7 @@ var response = await client.ChatAsync("session-123", "Do that again");
 
 ### Streaming with Thinking Orchestration
 
-Streaming uses a **Collect-and-Yield** pattern: chunks are yielded to the caller immediately while buffered internally. After the stream completes, the buffered response is processed through the full orchestration pipeline (reasoning parsing, budget tracking, context tracking).
+Streaming uses a **Collect-and-Yield** pattern: chunks are yielded to the caller immediately while buffered internally. After the stream completes, the buffered response is processed through the full orchestration pipeline (reasoning parsing, budget tracking, context tracking). A stream cut off at the output limit is not continued — the caller already has every chunk — and is reported as `TurnResult.WasTruncated`.
 
 ```csharp
 await foreach (var update in client.GetStreamingResponseAsync(messages))

@@ -10,7 +10,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <Version>0.23.1</Version>
+    <Version>0.24.0</Version>
   </PropertyGroup>
 
   <!-- NuGet Package Metadata -->
@@ -24,6 +24,11 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <!-- The MIT expression names the license; the text carries the copyright line a consumer's notices need. -->
+  <ItemGroup Condition="$(MSBuildProjectDirectory.Contains('\src\')) OR $(MSBuildProjectDirectory.Contains('/src/'))">
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="\" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)LICENSE')" />
+  </ItemGroup>
 
   <!-- Source Link for debugging -->
   <PropertyGroup>

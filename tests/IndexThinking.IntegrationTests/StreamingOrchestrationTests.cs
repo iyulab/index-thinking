@@ -63,6 +63,37 @@ public class StreamingOrchestrationTests
         turnResult!.WasTruncated.Should().BeFalse();
     }
 
+    // The caller already has every chunk of a truncated stream, so it is reported as truncated — not "continued" by
+    // appending the same aggregated response to itself (which recorded the fragment MaxContinuations + 1 times).
+    [Fact]
+    public async Task Streaming_TruncatedResponse_IsReportedTruncated_AndRecordedOnce()
+    {
+        const string fragment = "The quarterly figures show that revenue grew in every region, and";
+        var innerClient = new MockChatClient().WithResponse(fragment, ChatFinishReason.Length);
+
+        var services = new ServiceCollection()
+            .AddIndexThinkingAgents()
+            .AddIndexThinkingInMemoryStorage()
+            .BuildServiceProvider();
+
+        var client = new ChatClientBuilder(innerClient)
+            .UseIndexThinking()
+            .Build(services);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([new(ChatRole.User, "Summarise the report")],
+            cancellationToken: TestContext.Current.CancellationToken))
+        {
+            updates.Add(update);
+        }
+
+        var turnResult = updates.Last().AdditionalProperties![ThinkingChatClient.TurnResultKey] as TurnResult;
+        turnResult!.WasTruncated.Should().BeTrue();
+        turnResult.Metrics.ContinuationCount.Should().Be(0);
+        turnResult.Response.Text.Should().Be(fragment, "what is recorded is what the caller was streamed, once");
+        innerClient.CallCount.Should().Be(1);
+    }
+
     [Fact]
     public async Task Streaming_WithMetricsEnabled_IncludesMetricsInFinalUpdate()
     {
