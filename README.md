@@ -68,7 +68,7 @@ var response = await client.ChatAsync("session-123", "Do that again");
 
 ### Streaming with Thinking Orchestration
 
-Streaming uses a **Collect-and-Yield** pattern: chunks are yielded to the caller immediately while buffered internally. After the stream completes, the buffered response is processed through the full orchestration pipeline (reasoning parsing, budget tracking, context tracking). A stream cut off at the output limit is not continued — the caller already has every chunk — and is reported as `TurnResult.WasTruncated`.
+Streaming uses a **Collect-and-Yield** pattern: chunks are yielded to the caller immediately while buffered internally. After the stream completes, the buffered response is processed through the full orchestration pipeline (reasoning parsing, budget tracking, context tracking). A stream cut off at the output limit is not continued — the caller already has every chunk — and is reported as `TurnResult.WasTruncated`. The output-token boost and the context-window cap of `GetResponseAsync` do not apply either: a streamed request is sent with the caller's own `MaxOutputTokens`.
 
 ```csharp
 await foreach (var update in client.GetStreamingResponseAsync(messages))
