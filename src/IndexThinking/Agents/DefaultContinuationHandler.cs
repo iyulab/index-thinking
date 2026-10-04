@@ -55,6 +55,12 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         // Capture prompt token baseline from initial response usage (more accurate than estimation)
         var promptTokenBaseline = (int?)(initialResponse.Usage?.InputTokenCount);
 
+        // The messages the turn produced before its final answer — tool calls and their results when a function-invoking
+        // client sits below. They stay in the continuation requests (the model continues knowing what its tools did) and
+        // in the final response (the caller's history and its tool-call accounting see them). Only the final assistant
+        // message is the text being continued.
+        var turnPrefix = TurnPrefix(initialResponse);
+
         var intermediateResponses = new List<ChatResponse> { initialResponse };
         var fragments = new List<string>();
         var continuationCount = 0;
@@ -94,7 +100,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
             }
 
             // Build continuation messages
-            var continuationMessages = BuildContinuationMessages(context, currentResponse, config);
+            var continuationMessages = BuildContinuationMessages(context, turnPrefix, currentResponse, config);
 
             // Validate context token budget — if over limit, compact messages
             if (config.MaxContextTokens is > 0)
@@ -205,7 +211,7 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         combinedText = ApplyRecovery(combinedText, config);
 
         // Build final response
-        var finalResponse = BuildFinalResponse(currentResponse, combinedText);
+        var finalResponse = BuildFinalResponse(turnPrefix, currentResponse, combinedText, intermediateResponses);
 
         return new ContinuationResult
         {
@@ -256,10 +262,12 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
 
     private static List<ChatMessage> BuildContinuationMessages(
         ThinkingContext context,
+        IReadOnlyList<ChatMessage> turnPrefix,
         ChatResponse previousResponse,
         ContinuationConfig config)
     {
         var messages = new List<ChatMessage>(context.Messages);
+        messages.AddRange(turnPrefix);
 
         // Include previous response if configured
         if (config.IncludePreviousResponse)
@@ -360,9 +368,26 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         return text[startChar..];
     }
 
+    /// <summary>
+    /// The text of the response's final assistant message — the answer being continued. A response that also carries a
+    /// turn's earlier rounds (tool calls, an assistant message before them) would otherwise repeat those texts in every
+    /// continuation and in the combined answer.
+    /// </summary>
     private static string GetResponseText(ChatResponse response)
     {
-        return response.Text ?? string.Empty;
+        var last = response.Messages.Count > 0 ? response.Messages[^1] : null;
+        return last is not null && last.Role == ChatRole.Assistant
+            ? last.Text ?? string.Empty
+            : response.Text ?? string.Empty;
+    }
+
+    /// <summary>The messages before the response's final assistant message (all of them when it does not end on one).</summary>
+    private static IReadOnlyList<ChatMessage> TurnPrefix(ChatResponse response)
+    {
+        var messages = response.Messages;
+        return messages.Count > 0 && messages[^1].Role == ChatRole.Assistant
+            ? [.. messages.Take(messages.Count - 1)]
+            : [.. messages];
     }
 
     private static string CombineFragments(List<string> fragments, ContinuationConfig config)
@@ -412,16 +437,32 @@ public sealed class DefaultContinuationHandler : IContinuationHandler
         return text;
     }
 
-    private static ChatResponse BuildFinalResponse(ChatResponse lastResponse, string combinedText)
+    private static ChatResponse BuildFinalResponse(
+        IReadOnlyList<ChatMessage> turnPrefix,
+        ChatResponse lastResponse,
+        string combinedText,
+        IReadOnlyList<ChatResponse> responses)
     {
         var message = new ChatMessage(ChatRole.Assistant, combinedText);
 
-        // Preserve metadata from last response
-        return new ChatResponse([message])
+        // The turn's earlier messages, then the combined answer; usage is every request's, not only the last one's.
+        UsageDetails? usage = null;
+        foreach (var response in responses)
+        {
+            if (response.Usage is null)
+            {
+                continue;
+            }
+
+            usage ??= new UsageDetails();
+            usage.Add(response.Usage);
+        }
+
+        return new ChatResponse([.. turnPrefix, message])
         {
             FinishReason = lastResponse.FinishReason,
             ModelId = lastResponse.ModelId,
-            Usage = lastResponse.Usage,
+            Usage = usage ?? lastResponse.Usage,
             AdditionalProperties = lastResponse.AdditionalProperties
         };
     }

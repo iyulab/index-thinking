@@ -574,6 +574,54 @@ public class DefaultContinuationHandlerTests
         Assert.Contains("Second section", result.FinalResponse.Text);
     }
 
+    /// <summary>
+    /// A response from a function-invoking client: the turn's tool round, then the answer that was cut off.
+    /// </summary>
+    private static ChatResponse CreateToolRoundResponse(string answer)
+    {
+        var call = new FunctionCallContent("call-1", "write_file", new Dictionary<string, object?> { ["path"] = "a.txt" });
+        return new ChatResponse(
+        [
+            new ChatMessage(ChatRole.Assistant, [new TextContent("I'll write the file."), call]),
+            new ChatMessage(ChatRole.Tool, [new FunctionResultContent("call-1", "wrote a.txt")]),
+            new ChatMessage(ChatRole.Assistant, answer),
+        ])
+        {
+            Usage = new UsageDetails { InputTokenCount = 100, OutputTokenCount = 20 },
+        };
+    }
+
+    [Fact]
+    public async Task HandleAsync_TruncatedAfterAToolRound_KeepsTheToolRound_InTheFinalResponseAndTheContinuation()
+    {
+        // The tool round is part of the turn: dropping it loses the calls from the caller's accounting and from its
+        // history (the next turn's model would not see what its tools did), and the continuation would be asked of a
+        // model that does not know the round happened.
+        var context = CreateContext();
+        var continuation = CreateResponse("...and the file is written.");
+        continuation.Usage = new UsageDetails { InputTokenCount = 150, OutputTokenCount = 10 };
+        _truncationDetector.Detect(Arg.Any<ChatResponse>())
+            .Returns(TruncationInfo.Truncated(TruncationReason.TokenLimit), TruncationInfo.NotTruncated);
+        IList<ChatMessage>? sent = null;
+        var sendRequest = Substitute.For<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>();
+        sendRequest(Arg.Do<IList<ChatMessage>>(m => sent = m), Arg.Any<CancellationToken>()).Returns(Task.FromResult(continuation));
+
+        var result = await _handler.HandleAsync(context, CreateToolRoundResponse("Done: I wrote a.txt and"), sendRequest);
+
+        var messages = result.FinalResponse.Messages;
+        Assert.Equal(3, messages.Count);
+        Assert.Contains(messages[0].Contents, c => c is FunctionCallContent);
+        Assert.Contains(messages[1].Contents, c => c is FunctionResultContent);
+        Assert.Contains("Done: I wrote a.txt and", messages[2].Text);
+        Assert.Contains("the file is written", messages[2].Text);
+        Assert.DoesNotContain("I'll write the file.", messages[2].Text);
+
+        Assert.NotNull(sent);
+        Assert.Contains(sent!, m => m.Contents.OfType<FunctionResultContent>().Any());
+        Assert.Equal(250, result.FinalResponse.Usage!.InputTokenCount);
+        Assert.Equal(30, result.FinalResponse.Usage!.OutputTokenCount);
+    }
+
     private static ThinkingContext CreateContext(
         int maxContinuations = 5,
         bool throwOnMax = false,

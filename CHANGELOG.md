@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.24.1] - Unreleased
+
+### Fixed
+- **A continued answer keeps the turn's tool rounds.** When the answer of a turn that had already called tools was cut
+  off and continued, the final response held only the combined answer: the tool calls and their results were dropped, so
+  the caller's history lost them (the next turn's model no longer saw what its tools did) and a caller counting the
+  turn's tool calls saw none. The continuation requests also omitted them. Both now keep the turn's earlier messages; the
+  continued text is the final answer alone (not earlier assistant text repeated), and usage sums every request.
+
 ## [0.24.0] - 2026-10-02
 
 ### Fixed
