@@ -153,7 +153,7 @@ Both methods are called automatically by the continuation pipeline. They are als
 
 ## Documentation
 
-- [Architecture & Design](docs/ROADMAP.md)
+- [Design](docs/DESIGN.md)
 - [Memory Integration](docs/MEMORY_INTEGRATION.md)
 
 ## License
