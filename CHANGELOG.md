@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
-## [0.24.1] - Unreleased
+## [0.24.1] - 2026-10-04
 
 ### Fixed
 - **A continued answer keeps the turn's tool rounds.** When the answer of a turn that had already called tools was cut
