@@ -4,8 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Microsoft.Extensions.AI -->
-    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.6.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.6.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="10.10.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
     <!-- Tokenization -->
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />
@@ -13,26 +13,26 @@
     <!-- Security pin: Microsoft.ML.Tokenizers.Data.* 2.0.0 floats Microsoft.Bcl.Memory >=9.0.4,
          resolving to vulnerable 9.0.4 (NU1903 / GHSA-73j8-2gch-69rq / CVE-2026-26127, Base64Url
          OOB-read DoS). Pin patched 10.0.8 (>=10.0.4) so the fix flows to IndexThinking consumers. -->
-    <PackageVersion Include="Microsoft.Bcl.Memory" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Bcl.Memory" Version="10.0.12" />
     <!-- Storage -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <!-- Explicit lift: Microsoft.Data.Sqlite 10.0.8 pulls SQLitePCLRaw 2.1.11
          (NU1903 high, GHSA-2m69-gcr7-jv3q); upstream 2.1.12 stable landed 2026-07-09.
          Direct reference in IndexThinking so the >= 2.1.12 floor propagates to consumers. -->
     <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <!-- Distributed Caching -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.12" />
     <!-- Health Checks -->
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.12" />
     <!-- Dependency Injection -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <!-- Samples -->
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.6.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageVersion Include="DotNetEnv" Version="3.2.0" />
     <!-- AI Providers for Simulation Tests -->
     <PackageVersion Include="Anthropic" Version="12.53.0" />

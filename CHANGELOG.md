@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.24.2] - Unreleased
+
+### Dependencies
+- Microsoft.Extensions.AI 10.10.0, Microsoft.Extensions.AI.Abstractions 10.10.1, Microsoft.Extensions.AI.OpenAI 10.10.1 (from 10.6.0); Microsoft.Extensions.* and Microsoft.Data.Sqlite 10.0.12 servicing.
+
 ## [0.24.1] - 2026-10-04
 
 ### Fixed
