@@ -599,12 +599,20 @@ public class ThinkingChatClient : DelegatingChatClient
     }
 
     /// <summary>
-    /// Creates options for continuation requests with reasoning explicitly disabled.
-    /// Simply removing flags causes some models (e.g. Qwen3) to fall back to their
-    /// default behavior (thinking enabled), leaking untagged reasoning into content.
-    /// Setting to <c>false</c> explicitly disables reasoning for the continuation.
+    /// Creates options for continuation requests: reasoning explicitly disabled, and no tools.
     /// </summary>
-    private static ChatOptions? CreateContinuationOptions(ChatOptions? options)
+    /// <remarks>
+    /// <para>
+    /// Simply removing reasoning flags causes some models (e.g. Qwen3) to fall back to their default behavior (thinking
+    /// enabled), leaking untagged reasoning into content. Setting them to <c>false</c> disables reasoning.
+    /// </para>
+    /// <para>
+    /// A continuation asks the model to finish an answer that was cut off — not to act again. With the tools still
+    /// offered, a function-invoking client below runs a fresh round of calls on every continuation (past any iteration
+    /// cap the turn already reached), and those calls never reach the turn's messages: only the continued text is kept.
+    /// </para>
+    /// </remarks>
+    internal static ChatOptions? CreateContinuationOptions(ChatOptions? options)
     {
         if (options is null)
         {
@@ -612,6 +620,8 @@ public class ThinkingChatClient : DelegatingChatClient
         }
 
         var clone = options.Clone();
+        clone.Tools = null;
+        clone.ToolMode = null;
         if (clone.AdditionalProperties is not null)
         {
             // Explicitly disable rather than remove — absent flags may

@@ -33,6 +33,37 @@ public class ThinkingChatClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AContinuationRequest_OffersNoTools_SoAFunctionInvokingClientBelowCannotActAgain()
+    {
+        // The first request keeps the caller's tools; a continuation only finishes the cut-off answer. With tools still
+        // offered, a function-invoking client below would run a fresh round of calls that the turn never records.
+        var seen = new List<ChatOptions?>();
+        _innerClient.GetResponseAsync(Arg.Any<IEnumerable<ChatMessage>>(), Arg.Do<ChatOptions?>(o => seen.Add(o)), Arg.Any<CancellationToken>())
+            .Returns(new ChatResponse([new ChatMessage(ChatRole.Assistant, "part")]));
+        _turnManager
+            .ProcessTurnAsync(Arg.Any<ThinkingContext>(), Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(async call =>
+            {
+                var send = call.ArgAt<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>(1);
+                var messages = call.ArgAt<ThinkingContext>(0).Messages.ToList();
+                await send(messages, CancellationToken.None);
+                var continued = await send(messages, CancellationToken.None);
+                return TurnResult.Success(continued, TurnMetrics.CreateBuilder().Build());
+            });
+        var tool = AIFunctionFactory.Create((string path) => "ok", "write_file");
+
+        await _client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "write it")],
+            new ChatOptions { Tools = [tool], ToolMode = ChatToolMode.Auto },
+            TestContext.Current.CancellationToken);
+
+        seen.Should().HaveCount(2);
+        seen[0]!.Tools.Should().ContainSingle("the turn's own request keeps the tools");
+        seen[1]!.Tools.Should().BeNull("a continuation finishes the answer; it does not act again");
+        seen[1]!.ToolMode.Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetResponseAsync_DelegatesToTurnManager()
     {
         // Arrange

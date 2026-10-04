@@ -12,6 +12,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   the caller's history lost them (the next turn's model no longer saw what its tools did) and a caller counting the
   turn's tool calls saw none. The continuation requests also omitted them. Both now keep the turn's earlier messages; the
   continued text is the final answer alone (not earlier assistant text repeated), and usage sums every request.
+- **A continuation request offers no tools.** It carried the caller's tools, so a function-invoking client below ran a
+  fresh round of calls on each continuation — past any iteration cap the turn had reached — and those calls were never
+  recorded in the turn (only the continued text was kept). A continuation now only finishes the answer.
 
 ## [0.24.0] - 2026-10-02
 
