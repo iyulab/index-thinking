@@ -17,6 +17,8 @@ public class PublicApiConventionTests
 {
     private static readonly string[] KnownUncancellable =
     [
+        // The token travels in ThinkingContext.CancellationToken (ThinkingContext.WithCancellation), and the send
+        // delegate receives it; a second parameter would be a second token to keep in step.
         "IndexThinking.Agents.IContinuationHandler.HandleAsync(ThinkingContext, ChatResponse, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>)",
         "IndexThinking.Agents.IThinkingTurnManager.ProcessTurnAsync(ThinkingContext, Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>)",
     ];
