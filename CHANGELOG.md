@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.25.0] - Unreleased
+
+### Removed
+- **Breaking: public types that nothing used are removed.** No code path in this library constructed, returned or accepted them, and no implementation existed where they were interfaces. Code that never named them is unaffected; code that did can delete the reference - there was no behaviour behind it.
+  Removed: `OpenSourceChatCompletion`, `OpenSourceChoice`, `OpenSourceUsage`, `OpenSourceTokenDetails`, `OpenSourceModelFamilies`.
+
 ## [0.24.2] - 2026-10-05
 
 ### Dependencies
