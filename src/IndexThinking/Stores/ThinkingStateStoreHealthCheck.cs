@@ -72,7 +72,7 @@ public sealed class ThinkingStateStoreHealthCheck : IHealthCheck
                     ["timeout_seconds"] = _options.Timeout.TotalSeconds
                 });
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             return HealthCheckResult.Unhealthy(
                 $"ThinkingStateStore ({_store.GetType().Name}) is not accessible",

@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Changed
+- **Breaking: a cancelled `ThinkingStateStoreHealthCheck` throws `OperationCanceledException` instead of reporting
+  `Unhealthy`.** A probe whose caller gave up (for example a health endpoint request that was aborted) said the store was
+  not accessible. The check's own `Timeout` still reports `Degraded`. Migration: catch `OperationCanceledException` if you
+  call `CheckHealthAsync` directly and relied on the `Unhealthy` result.
+
 ## [0.25.0] - 2026-10-06
 
 ### Removed

@@ -72,6 +72,34 @@ public class ThinkingStateStoreHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_WhenTheCallerCancels_ShouldThrow_NotReportUnhealthy()
+    {
+        // Arrange: the probe's caller (the health check service, with the request's token) gives up mid-check.
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var mockStore = Substitute.For<IThinkingStateStore>();
+        mockStore
+            .ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                caller.Cancel();
+                callInfo.ArgAt<CancellationToken>(1).ThrowIfCancellationRequested();
+                return Task.FromResult(true);
+            });
+
+        var healthCheck = new ThinkingStateStoreHealthCheck(mockStore);
+        var context = new HealthCheckContext
+        {
+            Registration = new HealthCheckRegistration("test", healthCheck, null, null)
+        };
+
+        // Act
+        var act = () => healthCheck.CheckHealthAsync(context, caller.Token);
+
+        // Assert: a cancelled probe says nothing about the store.
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_WhenTimesOut_ShouldReturnDegraded()
     {
         // Arrange
