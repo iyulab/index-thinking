@@ -27,5 +27,5 @@ public class OptionsReachabilityRosterTests
 
     [Fact]
     public void EveryPublicOption_IsRead() =>
-        OptionsReachability.Scan(Libraries, IsOptions).ShouldMatchRoster(KnownUnread);
+        OptionsReachability.Scan(Libraries, OptionsTypes.WithNestedSettings(Libraries, IsOptions)).ShouldMatchRoster(KnownUnread);
 }
