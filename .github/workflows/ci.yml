@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - '**/*.props'
+      - '**/*.targets'
       - 'src/**'
       - 'tests/**'
       - '*.slnx'
