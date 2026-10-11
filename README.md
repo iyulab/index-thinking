@@ -37,8 +37,6 @@ Each row: what it does · entry point · how to turn it on. "Default" means the 
 | Store health check | `ThinkingStateStoreHealthCheck` | Opt-in: `AddIndexThinkingHealthChecks()`, then `services.AddHealthChecks().AddCheck<ThinkingStateStoreHealthCheck>("thinking-state-store")` |
 | Metrics (meter `IndexThinking`: `indexthinking.turns.total`, `.continuations.total`, `.truncations.total`, `.tokens.thinking`, `indexthinking.turn.duration`) | `IndexThinkingMeter` | Opt-in: `AddIndexThinkingMetrics()` — the DI `UseIndexThinking()` records every turn on it (or pass `meter:` to the `ThinkingChatClient` constructor) |
 
-**Not wired yet:** `IMemoryProvider` (`AddIndexThinkingMemory(…)`, `AddIndexThinkingNullMemory()`) is a contract only — the turn pipeline does not call it, so registering a provider changes nothing today. Call `RecallAsync` yourself and add the result to the messages if you need long-term memory in a turn.
-
 ## Scope
 
 IndexThinking manages a **single LLM turn**, not multi-step workflows.
@@ -50,6 +48,8 @@ IndexThinking manages a **single LLM turn**, not multi-step workflows.
 | Used BY orchestrators | Uses IndexThinking |
 
 **Token counting role boundary** — IndexThinking owns token *counting* (`ITokenCounter`, framework-neutral; `IChatMessageTokenCounter` for M.E.AI `ChatMessage` counting). Model *metadata* (context window, pricing) belongs to TokenMeter; combining the two into budget enforcement belongs to the consuming pipeline.
+
+**Long-term memory boundary** — IndexThinking keeps no long-term memory and calls no memory store. To give a turn recalled memories, recall them before the turn and add them to the messages you send.
 
 ## Packages
 
@@ -174,7 +174,6 @@ Both methods are called automatically by the continuation pipeline. They are als
 ## Documentation
 
 - [Design](docs/DESIGN.md)
-- [Memory Integration](docs/MEMORY_INTEGRATION.md)
 
 ## License
 

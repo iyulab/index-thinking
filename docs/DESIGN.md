@@ -42,5 +42,3 @@ Agent orchestrator (any framework)
 | Turn state lives in `IThinkingStateStore`, apart from the chat client | The chat client stays stateless |
 | Budgets are advisory, not enforced | Hard caps on reasoning length degrade answers ("token elasticity", TALE); `IBudgetTracker` reports, it does not cut |
 | Standard `ChatMessage` / `ChatResponse` / `ChatOptions` types throughout | No custom request/response types to convert at the boundary |
-
-See [MEMORY_INTEGRATION.md](MEMORY_INTEGRATION.md) for connecting a memory provider.

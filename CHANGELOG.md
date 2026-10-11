@@ -6,6 +6,15 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ## [Unreleased]
 
+### Removed
+- **Breaking: the long-term memory contract is gone** — `IMemoryProvider`, `NullMemoryProvider`, `FuncMemoryProvider`,
+  `MemoryRecallHandler`/`MemoryRememberHandler`, `MemoryRecallResult`, `MemoryRecallContext`, `MemoryEntry`, `MemoryScope`,
+  `MemoryStoreRequest`, `AddIndexThinkingMemory(…)` (all overloads), `AddIndexThinkingNullMemory()`, and
+  `ThinkingContext.UserId`/`MemoryContext`/`WithUserId`/`WithMemory`/`HasMemory`, together with `docs/MEMORY_INTEGRATION.md`.
+  The turn pipeline never called the provider, so registering one changed nothing. Migration: delete the registration; to give
+  a turn recalled memories, recall them from your memory store before the turn and add
+  them to the messages.
+
 ### Changed
 - **The nuget.org «Release Notes» of every package link to the GitHub release of its version**, whose notes are this CHANGELOG's section for that version.
 
