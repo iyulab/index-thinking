@@ -14,6 +14,11 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   The turn pipeline never called the provider, so registering one changed nothing. Migration: delete the registration; to give
   a turn recalled memories, recall them from your memory store before the turn and add
   them to the messages.
+- **Breaking: response and request wire models the parsers never read are gone** — `AnthropicMessageResponse`,
+  `AnthropicUsage`, `AnthropicThinkingConfig`, `GeminiResponse`, `GeminiCandidate`, `GeminiContent`, `GeminiUsageMetadata`,
+  `GeminiThinkingConfig`, `OpenAIReasoningUsage`, `OpenAIOutputTokenDetails`, `OpenAIReasoningConfig`. The parsers read the
+  provider JSON themselves and only use the content-part and reasoning-item models, which stay. Migration: declare your own
+  type if you serialized one of these.
 
 ### Changed
 - **The nuget.org «Release Notes» of every package link to the GitHub release of its version**, whose notes are this CHANGELOG's section for that version.
