@@ -6,6 +6,16 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ## [Unreleased]
 
+### Fixed
+- **`AddIndexThinkingMetrics()` and `AddIndexThinkingReasoningModifiers(…)` take effect on a client built with
+  `UseIndexThinking()`.** The DI form never resolved the registered `IndexThinkingMeter` or `ReasoningRequestModifierRegistry`,
+  so no turn was recorded and a custom registry was ignored. A registered registry still does not turn reasoning on: that
+  remains `ThinkingChatClientOptions.EnableReasoning`.
+
+### Documentation
+- **`docs/MEMORY_INTEGRATION.md` says that the turn pipeline does not call `IMemoryProvider`.** The guide had presented it as
+  integrated. The contract is unchanged; call it from your own code.
+
 ### Changed
 - **The packages from this repository depend on each other at exactly the same version** (`[x.y.z]`), not a floor.
   A consumer that moves one of them while a family member it depends on resolves at an older version now gets restore warning NU1608 naming

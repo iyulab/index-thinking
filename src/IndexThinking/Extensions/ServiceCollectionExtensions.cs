@@ -490,9 +490,9 @@ public static class ServiceCollectionExtensions
     /// support for DeepSeek, Qwen, vLLM, and GPUStack models.
     /// </para>
     /// <para>
-    /// This is automatically called when using <c>ThinkingChatClient</c> with
-    /// <c>EnableReasoning = true</c>, but can be called explicitly if you need
-    /// to customize the registry.
+    /// Without a registration, a client with <c>EnableReasoning = true</c> uses
+    /// <see cref="ReasoningRequestModifierRegistry.Default"/>. A registered registry is what the DI form of
+    /// <c>UseIndexThinking()</c> passes to the client; it does not turn reasoning on by itself.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddIndexThinkingReasoningModifiers(this IServiceCollection services)

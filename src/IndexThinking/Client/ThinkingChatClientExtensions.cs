@@ -1,6 +1,8 @@
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Core;
+using IndexThinking.Diagnostics;
+using IndexThinking.Modifiers;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -71,12 +73,16 @@ public static class ThinkingChatClientExtensions
             var contextTracker = services.GetService<IContextTracker>();
             var contextInjector = services.GetService<IContextInjector>();
             var tokenCounter = services.GetService<ITokenCounter>();
+            // What AddIndexThinkingMetrics() and AddIndexThinkingReasoningModifiers(…) registered. A registry does not
+            // turn reasoning on by itself — ThinkingChatClientOptions.EnableReasoning still decides.
+            var meter = services.GetService<IndexThinkingMeter>();
+            var modifierRegistry = services.GetService<ReasoningRequestModifierRegistry>();
 
             var options = new ThinkingChatClientOptions();
             configure?.Invoke(options);
 
             return new ThinkingChatClient(innerClient, turnManager, options, contextTracker, contextInjector,
-                tokenCounter: tokenCounter);
+                meter, modifierRegistry, tokenCounter);
         });
     }
 

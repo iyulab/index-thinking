@@ -25,6 +25,12 @@ IndexThinking is a **Working Memory Manager** that handles the current flow of t
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **Status: the contract is here; the turn pipeline does not call it yet.** `ThinkingChatClient` never calls
+> `IMemoryProvider`, and `ThinkingContext.MemoryContext` is not filled in. Registering a provider
+> (`AddIndexThinkingMemory(…)`) makes it available to your own code: call `RecallAsync` before a turn and put what you
+> want the model to see into the messages, and call `RememberAsync` after it. The rest of this guide describes the
+> contract and the backends you can plug into it.
+
 ## Memory Scopes
 
 IndexThinking supports three memory scopes:
