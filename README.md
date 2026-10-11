@@ -14,7 +14,30 @@ IndexThinking handles the repetitive-but-hard parts of LLM integration:
 - **Context Tracking** - Session-aware conversation with sliding window
 - **Token Management** - Token usage tracking (`IBudgetTracker`) and complexity estimation (`IComplexityEstimator`), reported in turn metrics — informational, not limits. To cap how much a model thinks, set it on the request: `ChatOptions.Reasoning` (effort) and `ChatOptions.MaxOutputTokens`; IndexThinking extracts the reasoning, it does not throttle it
 - **Content Recovery** - Repair truncated JSON/code blocks
-- **Thinking State Stores** - `IThinkingStateStore` with an in-memory default (`AddIndexThinkingInMemoryStorage`) and a distributed-cache store in the core package; a persistent SQLite store is opt-in (below)
+- **Thinking State Stores** - `IThinkingStateStore` implementations: in-memory (`AddIndexThinkingInMemoryStorage`) and distributed-cache (`AddIndexThinkingDistributedStorage`) in the core package, persistent SQLite in `IndexThinking.Sqlite`. All are opt-in — `AddIndexThinkingAgents` registers no store, and without one no per-session state is saved
+
+## Features
+
+Each row: what it does · entry point · how to turn it on. "Default" means the Quick Start registration (`AddIndexThinkingAgents()` + `UseIndexThinking()`) already enables it.
+
+| Feature | Entry point | How to turn it on |
+|---|---|---|
+| Turn pipeline over any `IChatClient` | `ChatClientBuilder.UseIndexThinking()` → `ThinkingChatClient` | Register `AddIndexThinkingAgents()` (required — resolves `IThinkingTurnManager`), then `UseIndexThinking(o => …)`; or `new ThinkingChatClient(inner, turnManager, options, …)` without DI |
+| Truncation detection + auto-continuation | `ITruncationDetector`, `IContinuationHandler`; limits in `ThinkingChatClientOptions.DefaultContinuation` (`ContinuationConfig`: `MaxContinuations` 5, `MaxTotalDuration` 5 min, …) | Default on `GetResponseAsync`. A truncated stream is not continued — it is reported as `TurnResult.WasTruncated` |
+| Truncated JSON / code-block repair | `ContentRecoveryUtils` (`TryRecoverJson`, `TryRecoverCodeBlocks`, `CombineFragments`) | Default during continuation (`ContinuationConfig.EnableJsonRecovery` / `EnableCodeBlockRecovery`, both `true`); also callable directly |
+| Reasoning extraction (OpenAI, Anthropic, Gemini, `<think>` tags) | `IReasoningParser`, `ReasoningParserRegistry.Default`; result via `response.GetThinkingContent()` | Default (`IncludeThinkingInMetadata = true`) |
+| Turn metrics | `response.GetTurnMetrics()` / `GetTurnResult()`; on a stream, the final update's `AdditionalProperties[ThinkingChatClient.TurnResultKey]` | Default (`IncludeMetricsInMetadata = true`) |
+| Reasoning activation for DeepSeek / Qwen / vLLM / GPUStack | `ReasoningRequestModifierRegistry.Default` | Opt-in: `ThinkingChatClientOptions.EnableReasoning = true` (`AutoDetectReasoningRequirement` keeps it to models that need it). A custom registry from `AddIndexThinkingReasoningModifiers(…)` is not picked up by the DI `UseIndexThinking()` overload — pass it as `modifierRegistry:` to the `ThinkingChatClient` constructor |
+| Live `<think>` separation in streams | `ThinkingChatClientOptions.SeparateReasoningInStream` | Opt-in (default `false`) — see below |
+| Session context tracking + injection | `IContextTracker` (`InMemoryContextTracker`), `IContextInjector`; session id from `client.ChatAsync(sessionId, …)` / `SendAsync` or `ChatOptions` key `IndexThinking.SessionId` | Opt-in: `AddIndexThinkingContext(…)` (`ContextTrackerOptions.MaxTurns` 10, `SessionTtl` 1 h). `EnableContextTracking` / `EnableContextInjection` turn either half off |
+| Token counting | `ITokenCounter` / `IChatMessageTokenCounter`: `ApproximateTokenCounter` (registered by `AddIndexThinkingAgents`), `TiktokenTokenCounter.ForModel(…)`, `TokenCounterFactory` | Default approximate counter; register your own `ITokenCounter` before `AddIndexThinkingAgents()` to replace it |
+| Output-token boost and cap to the context window | `ThinkingChatClientOptions.ThinkingOutputMultiplier` (2, applied when reasoning is enabled), `MaxContextTokens` | Default on `GetResponseAsync` when the request sets `MaxOutputTokens` and a token counter is available (the cap); not applied to streams |
+| Budget / complexity reporting | `IBudgetTracker`, `IComplexityEstimator` | Default; informational only (see What It Does) |
+| Per-session thinking state | `IThinkingStateStore` | Opt-in: `AddIndexThinkingInMemoryStorage()`, `AddIndexThinkingDistributedStorage()` (needs an `IDistributedCache`), or `AddIndexThinkingSqliteStorage(connectionString)` from `IndexThinking.Sqlite` |
+| Store health check | `ThinkingStateStoreHealthCheck` | Opt-in: `AddIndexThinkingHealthChecks()`, then `services.AddHealthChecks().AddCheck<ThinkingStateStoreHealthCheck>("thinking-state-store")` |
+| Metrics (meter `IndexThinking`: `indexthinking.turns.total`, `.continuations.total`, `.truncations.total`, `.tokens.thinking`, `indexthinking.turn.duration`) | `IndexThinkingMeter` | Recorded only when the meter is passed as `meter:` to the `ThinkingChatClient` constructor. `AddIndexThinkingMetrics()` registers the meter, but the DI `UseIndexThinking()` overload does not pass it to the client yet |
+
+**Not wired yet:** `IMemoryProvider` (`AddIndexThinkingMemory(…)`, `AddIndexThinkingNullMemory()`) is a contract only — the turn pipeline does not call it, so registering a provider changes nothing today. Call `RecallAsync` yourself and add the result to the messages if you need long-term memory in a turn.
 
 ## Scope
 
@@ -62,8 +85,8 @@ var metrics = response.GetTurnMetrics();
 ### Session-Aware Chat
 
 ```csharp
-// Context is automatically tracked and injected
-var response = await client.ChatAsync("session-123", "Do that again");
+// Context is tracked and injected per session (requires AddIndexThinkingContext)
+string answer = await client.ChatAsync("session-123", "Do that again");
 ```
 
 ### Streaming with Thinking Orchestration
@@ -98,12 +121,14 @@ providers (OpenAI o-series, Anthropic, Gemini) already emit a separate channel, 
 > `update.Contents` (as below) or reasoning deltas will be silently dropped.
 
 ```csharp
-var options = new ThinkingChatClientOptions
-{
-    SeparateReasoningInStream = true,        // default false
-    // StreamingReasoningStartTag = "<think>",  // defaults shown
-    // StreamingReasoningEndTag   = "</think>",
-};
+var client = new ChatClientBuilder(innerClient)
+    .UseIndexThinking(o =>
+    {
+        o.SeparateReasoningInStream = true;         // default false
+        // o.StreamingReasoningStartTag = "<think>";  // defaults shown
+        // o.StreamingReasoningEndTag   = "</think>";
+    })
+    .Build(serviceProvider);
 
 await foreach (var update in client.GetStreamingResponseAsync(messages))
 {
@@ -132,13 +157,8 @@ await foreach (var update in client.GetStreamingResponseAsync(messages))
 Some providers require explicit reasoning activation:
 
 ```csharp
-var options = new ThinkingChatClientOptions
-{
-    EnableReasoning = true  // Adds include_reasoning: true to requests
-};
-
 var client = new ChatClientBuilder(innerClient)
-    .UseIndexThinking(options)
+    .UseIndexThinking(o => o.EnableReasoning = true)  // adds the provider's reasoning flag to requests
     .Build(serviceProvider);
 ```
 
