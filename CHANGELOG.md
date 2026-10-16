@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Added
+- **Fit a request into a token budget without breaking tool rounds: `ContextBudgetChatReducer`.** An M.E.AI `IChatReducer`
+  (`ChatClientBuilder.UseChatReducer(…)`) for any `IChatClient` pipeline: a tool result over `MaxToolResultChars` (30 000)
+  keeps its head and tail, and while the request is over `MaxInputTokens` the oldest messages are dropped — an assistant
+  message that calls tools always together with the results that answer it, so no request carries a call without its result
+  or a result without its call (M.E.AI's own reducers count messages and can split them). System messages, the last user
+  message and the newest message or round stay; each dropped run is replaced by one note where it was. The caller's history
+  is untouched. Registered after `UseFunctionInvocation()`, it fits every round of a tool loop.
+
+### Changed
+- **Scope: IndexThinking shapes one model call** — it fits what goes in to the window and reads what comes out (was: «one
+  LLM turn»). The README and `docs/DESIGN.md` say so; no API changed with it.
+
 ## [0.27.0] - 2026-10-16
 
 ### Added

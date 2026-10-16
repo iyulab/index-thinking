@@ -7,21 +7,23 @@
 3. **Single responsibility** — each component does one thing.
 4. **Provider agnostic** — parse the reasoning a response carries; do not couple to one vendor's request API.
 
-## Scope: one LLM turn, not orchestration
+## Scope: one model call, not orchestration
 
-IndexThinking is not an agent orchestrator. It optimises a single request/response turn; an orchestrator uses it as a
-building block on each call it makes.
+IndexThinking is not an agent orchestrator. It shapes one model call — it fits what goes in to the context window and
+interprets what comes out; an orchestrator uses it as a building block on each call it makes.
 
 | Aspect | IndexThinking | Agent orchestration |
 |--------|---------------|---------------------|
-| Focus | One LLM turn | Multi-step, multi-agent coordination |
-| Responsibility | Reasoning parsing, token budget, truncation detection and recovery | Task routing, tool management, workflow control |
+| Focus | One model call: the request fits the window, the response is read | Multi-step, multi-agent coordination |
+| Responsibility | Token counting, fitting a request to a budget, reasoning parsing, truncation detection and recovery | Task routing, tool management, workflow control, what the conversation history keeps |
 | Input | One request/response pair | A task needing many LLM calls |
 | State | Within a turn (thinking state) | Across a conversation or workflow |
 | Integration point | Middleware in the `IChatClient` pipeline | Consumes IndexThinking per call |
 
-IndexThinking does: extract thinking/reasoning content from a response · track token budgets and cost · detect a
-truncated response and continue it · keep provider reasoning state (signatures, `encrypted_content`) across a turn.
+IndexThinking does: count a request's tokens · fit a request into a token budget without breaking tool rounds
+(`ContextBudgetChatReducer` — the caller's history is untouched) · extract thinking/reasoning content from a response · track
+token budgets and cost · detect a truncated response and continue it · keep provider reasoning state (signatures,
+`encrypted_content`) across a turn.
 
 It does not: split a task into several LLM calls · route work between agents · coordinate tool or function calls ·
 manage workflow state.

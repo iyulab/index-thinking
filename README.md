@@ -30,6 +30,7 @@ Each row: what it does · entry point · how to turn it on. "Default" means the 
 | Reasoning activation for DeepSeek / Qwen / vLLM / GPUStack | `ReasoningRequestModifierRegistry.Default` | Opt-in: `ThinkingChatClientOptions.EnableReasoning = true` (`AutoDetectReasoningRequirement` keeps it to models that need it). A custom registry from `AddIndexThinkingReasoningModifiers(…)` is what the DI `UseIndexThinking()` uses (or pass `modifierRegistry:` to the `ThinkingChatClient` constructor); registering it does not turn reasoning on by itself |
 | Live `<think>` separation in streams | `ThinkingChatClientOptions.SeparateReasoningInStream` | Opt-in (default `false`) — see below |
 | Session context tracking + injection | `IContextTracker` (`InMemoryContextTracker`), `IContextInjector`; session id from `client.ChatAsync(sessionId, …)` / `SendAsync` or `ChatOptions` key `IndexThinking.SessionId` | Opt-in: `AddIndexThinkingContext(…)` (`ContextTrackerOptions.MaxTurns` 10, `SessionTtl` 1 h). `EnableContextTracking` / `EnableContextInjection` turn either half off |
+| Fit a request into a token budget | `ContextBudgetChatReducer` (`ContextBudgetOptions`: `MaxInputTokens` required, `MaxToolResultChars` 30 000) — an M.E.AI `IChatReducer`: tool results over the limit keep head and tail, then the oldest messages leave, a tool round (call + results) always whole; system messages, the last user message and the newest round stay; a note marks each gap | Opt-in: `ChatClientBuilder.UseChatReducer(new ContextBudgetChatReducer(new() { MaxInputTokens = … }))`, registered after `UseFunctionInvocation()` so every round of a tool loop is fitted |
 | Token counting | `ITokenCounter` / `IChatMessageTokenCounter`: `ApproximateTokenCounter` (registered by `AddIndexThinkingAgents`), `TiktokenTokenCounter.ForModel(…)`, `TokenCounterFactory` | Default approximate counter — within a few percent of o200k_base on prose, Korean, code and JSON; a message counts its text, tool calls and results, reasoning and images (`ImageTokens` each). Other tokenizers differ (cl100k needs ~1.5x more for Korean). The client also counts the request's tool definitions and, by default, scales its estimates by what the provider reports (`CalibrateTokenCounts`, `TokenEstimateFactor`). Register your own `ITokenCounter` before `AddIndexThinkingAgents()` to replace it |
 | Output-token boost and cap to the context window | `ThinkingChatClientOptions.ThinkingOutputMultiplier` (2, applied when reasoning is enabled), `MaxContextTokens` | Default on `GetResponseAsync` when the request sets `MaxOutputTokens` and a token counter is available (the cap); not applied to streams |
 | Budget / complexity reporting | `IBudgetTracker`, `IComplexityEstimator` | Default; informational only (see What It Does) |
@@ -39,7 +40,7 @@ Each row: what it does · entry point · how to turn it on. "Default" means the 
 
 ## Scope
 
-IndexThinking manages a **single LLM turn**, not multi-step workflows.
+IndexThinking shapes **one model call** — it fits what goes in to the context window and reads what comes out — not multi-step workflows.
 
 | IndexThinking | Agent Orchestrators |
 |---------------|---------------------|
@@ -47,7 +48,7 @@ IndexThinking manages a **single LLM turn**, not multi-step workflows.
 | Building block | Workflow controller |
 | Used BY orchestrators | Uses IndexThinking |
 
-**Token counting role boundary** — IndexThinking owns token *counting* (`ITokenCounter`, framework-neutral; `IChatMessageTokenCounter` for M.E.AI `ChatMessage` counting). Model *metadata* (context window, pricing) belongs to TokenMeter; combining the two into budget enforcement belongs to the consuming pipeline.
+**Token counting role boundary** — IndexThinking owns token *counting* (`ITokenCounter`, framework-neutral; `IChatMessageTokenCounter` for M.E.AI `ChatMessage` counting). Model *metadata* (context window, pricing) belongs to TokenMeter; the consumer picks the budget from the window it knows, and `ContextBudgetChatReducer` fits a request into it.
 
 **Long-term memory boundary** — IndexThinking keeps no long-term memory and calls no memory store. To give a turn recalled memories, recall them before the turn and add them to the messages you send.
 
