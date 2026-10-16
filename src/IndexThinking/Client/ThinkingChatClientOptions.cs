@@ -129,6 +129,15 @@ public class ThinkingChatClientOptions
     /// </summary>
     public int ThinkingOutputMultiplier { get; set; } = 2;
 
+    /// <summary>
+    /// Scales the client's input estimates by what the provider reports: each response's <c>Usage.InputTokenCount</c> is
+    /// compared with the estimate for the same request (messages and tool definitions), and a moving factor corrects later
+    /// estimates for the context check and the output cap. The approximate counter is fitted to OpenAI's o200k_base; a model
+    /// with another tokenizer (most local models, most on Korean) is otherwise off by a steady factor. The factor is per
+    /// client - one model. Default: true.
+    /// </summary>
+    public bool CalibrateTokenCounts { get; set; } = true;
+
     // ========================================
     // Live Streaming Reasoning Separation (v0.20.0)
     // ========================================

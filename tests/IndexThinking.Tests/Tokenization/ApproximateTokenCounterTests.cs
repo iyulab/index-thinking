@@ -85,16 +85,14 @@ public class ApproximateTokenCounterTests
     }
 
     [Fact]
-    public void Count_OnlyWhitespace_ReturnsZero()
+    public void Count_OnlyWhitespace_IsOneRun()
     {
-        // Arrange
+        // A run of whitespace reaches the model as a token (o200k: "   \n\t  " is 1 token), however long it is
         var text = "   \n\t  ";
 
-        // Act
         var count = _counter.Count(text);
 
-        // Assert
-        count.Should().Be(0);
+        count.Should().Be(1);
     }
 
     [Fact]

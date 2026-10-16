@@ -6,6 +6,7 @@ using IndexThinking.Context;
 using IndexThinking.Core;
 using IndexThinking.Diagnostics;
 using IndexThinking.Modifiers;
+using IndexThinking.Tokenization;
 using Microsoft.Extensions.AI;
 
 namespace IndexThinking.Client;
@@ -34,6 +35,7 @@ public class ThinkingChatClient : DelegatingChatClient
     private readonly IndexThinkingMeter? _meter;
     private readonly ReasoningRequestModifierRegistry? _modifierRegistry;
     private readonly ITokenCounter? _tokenCounter;
+    private readonly TokenEstimateCalibration? _calibration;
 
     /// <summary>
     /// Metadata key for storing <see cref="ThinkingContent"/> in the response.
@@ -79,7 +81,14 @@ public class ThinkingChatClient : DelegatingChatClient
         _meter = meter;
         _modifierRegistry = modifierRegistry ?? (_options.EnableReasoning ? ReasoningRequestModifierRegistry.Default : null);
         _tokenCounter = tokenCounter;
+        _calibration = tokenCounter is not null && _options.CalibrateTokenCounts ? new TokenEstimateCalibration() : null;
     }
+
+    /// <summary>
+    /// The factor the client's input estimates are scaled by (<see cref="ThinkingChatClientOptions.CalibrateTokenCounts"/>),
+    /// learned from the provider's reported input tokens; 1 before any response, or with calibration off.
+    /// </summary>
+    public double TokenEstimateFactor => _calibration?.Factor ?? 1.0;
 
     /// <inheritdoc />
     public override async Task<ChatResponse> GetResponseAsync(
@@ -99,7 +108,7 @@ public class ThinkingChatClient : DelegatingChatClient
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
         // Validate input tokens fit within context window
-        ValidateInputTokens(enrichedMessages);
+        ValidateInputTokens(enrichedMessages, modifiedOptions);
 
         // Create thinking context from messages and options
         var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
@@ -132,7 +141,9 @@ public class ThinkingChatClient : DelegatingChatClient
                 // Auto-cap MaxOutputTokens to fit within context window (heuristic)
                 opts = CapMaxOutputTokens(opts, msgs);
 
-                return await base.GetResponseAsync(msgs, opts, ct);
+                var response = await base.GetResponseAsync(msgs, opts, ct);
+                ObserveInputTokens(msgs, opts, response.Usage);
+                return response;
             });
 
         // Track conversation if enabled
@@ -180,7 +191,7 @@ public class ThinkingChatClient : DelegatingChatClient
         var enrichedMessages = InjectConversationContext(sessionId, messageList);
 
         // Validate input tokens fit within context window
-        ValidateInputTokens(enrichedMessages);
+        ValidateInputTokens(enrichedMessages, modifiedOptions);
 
         // Collect-and-Yield: buffer updates while streaming to caller. The collected updates are always the
         // ORIGINAL (raw) updates so post-stream orchestration (reasoning parsing, turn manager) is unchanged;
@@ -210,6 +221,7 @@ public class ThinkingChatClient : DelegatingChatClient
         if (collectedUpdates.Count > 0)
         {
             var aggregatedResponse = collectedUpdates.ToChatResponse();
+            ObserveInputTokens(enrichedMessages, modifiedOptions, aggregatedResponse.Usage);
 
             var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
@@ -436,7 +448,7 @@ public class ThinkingChatClient : DelegatingChatClient
     /// Validates that input tokens do not exceed the configured context window.
     /// </summary>
     /// <exception cref="ContextWindowExceededException">When input tokens exceed the limit.</exception>
-    private void ValidateInputTokens(IList<ChatMessage> messages)
+    private void ValidateInputTokens(IList<ChatMessage> messages, ChatOptions? options)
     {
         if (_tokenCounter is null)
             return;
@@ -445,9 +457,7 @@ public class ThinkingChatClient : DelegatingChatClient
         if (maxContext is null or <= 0)
             return;
 
-        var inputTokens = 0;
-        foreach (var msg in messages)
-            inputTokens += _tokenCounter.CountMessage(msg);
+        var inputTokens = EstimateInputTokens(messages, options);
 
         // Same 1.15x safety margin as CapMaxOutputTokens
         var safeInputTokens = (int)(inputTokens * 1.15);
@@ -562,6 +572,39 @@ public class ThinkingChatClient : DelegatingChatClient
     /// Caps MaxOutputTokens so that input + output fits within MaxContextTokens.
     /// Prevents HTTP 400 errors when the requested max_tokens exceeds available space.
     /// </summary>
+    /// <summary>
+    /// What the request is expected to cost in input tokens: its messages and the tool definitions it offers, scaled by the
+    /// learned factor (<see cref="ThinkingChatClientOptions.CalibrateTokenCounts"/>).
+    /// </summary>
+    private int EstimateInputTokens(IList<ChatMessage> messages, ChatOptions? options)
+    {
+        var raw = RawInputEstimate(messages, options);
+        return _calibration?.Scale(raw) ?? raw;
+    }
+
+    private int RawInputEstimate(IList<ChatMessage> messages, ChatOptions? options)
+    {
+        var counter = _tokenCounter!;
+        var tokens = 0;
+        foreach (var msg in messages)
+        {
+            tokens += counter.CountMessage(msg);
+        }
+
+        return tokens + ChatMessageContents.CountTools(options?.Tools, counter.Count);
+    }
+
+    /// <summary>Learns the estimate's factor from what the provider counted for this request.</summary>
+    private void ObserveInputTokens(IList<ChatMessage> messages, ChatOptions? options, UsageDetails? usage)
+    {
+        if (_calibration is null || usage?.InputTokenCount is not { } actual)
+        {
+            return;
+        }
+
+        _calibration.Observe(RawInputEstimate(messages, options), actual);
+    }
+
     private ChatOptions? CapMaxOutputTokens(ChatOptions? options, IList<ChatMessage> messages)
     {
         if (_tokenCounter is null || options?.MaxOutputTokens is null or <= 0)
@@ -575,14 +618,11 @@ public class ThinkingChatClient : DelegatingChatClient
             return options;
         }
 
-        var inputTokens = 0;
-        foreach (var msg in messages)
-        {
-            inputTokens += _tokenCounter.CountMessage(msg);
-        }
+        var inputTokens = EstimateInputTokens(messages, options);
 
-        // Light safety margin for approximate token counting.
-        // If this still exceeds the limit, catch-and-retry handles it.
+        // Light safety margin for approximate token counting. An estimate can still be low for a tokenizer unlike
+        // o200k (local models, most on Korean); such a request fails with the provider's context error - nothing here
+        // retries it.
         var safeInputTokens = (int)(inputTokens * 1.15);
         const int buffer = 128;
         var available = maxContext.Value - safeInputTokens - buffer;

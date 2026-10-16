@@ -63,24 +63,7 @@ public sealed class TiktokenTokenCounter : IChatMessageTokenCounter
     }
 
     /// <inheritdoc />
-    public int Count(ChatMessage message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-
-        var textTokens = 0;
-
-        // Count tokens in all text content
-        foreach (var content in message.Contents)
-        {
-            if (content is TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
-            {
-                textTokens += Count(textContent.Text);
-            }
-        }
-
-        // Add overhead for message structure
-        return textTokens + MessageOverhead;
-    }
+    public int Count(ChatMessage message) => ChatMessageContents.Count(message, Count, MessageOverhead);
 
     /// <inheritdoc />
     public bool SupportsModel(string modelId)

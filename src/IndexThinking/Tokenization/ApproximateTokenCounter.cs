@@ -1,4 +1,3 @@
-using System.Globalization;
 using IndexThinking.Abstractions;
 using Microsoft.Extensions.AI;
 
@@ -9,8 +8,9 @@ namespace IndexThinking.Tokenization;
 /// Used as a fallback when exact tokenization is not available.
 /// </summary>
 /// <remarks>
-/// This counter provides estimates that are typically within ±20% of actual token counts.
-/// It uses language detection to apply appropriate ratios for different scripts.
+/// Each kind of character has its own ratio (<see cref="LanguageRatios"/>); with the defaults the estimate is within a few
+/// percent of o200k_base on English, Korean, mixed prose, code and JSON. A message counts everything it carries - text, tool
+/// calls and their arguments, tool results, reasoning, images - not only its text.
 /// </remarks>
 public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
 {
@@ -20,6 +20,13 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
     /// Overhead tokens added per chat message for role and formatting.
     /// </summary>
     public const int MessageOverhead = 4;
+
+    /// <summary>
+    /// What one image in a message counts: a counter that sees no pixels charges a typical image once (providers price
+    /// images by size - OpenAI about 765 tokens for 1024 x 1024 at high detail, Anthropic about 1,600 for 1.15 megapixels).
+    /// The exact counter charges the same.
+    /// </summary>
+    public const int ImageTokens = ChatMessageContents.ImageTokens;
 
     /// <summary>
     /// Creates an approximate counter with default language ratios.
@@ -45,19 +52,19 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
         if (string.IsNullOrEmpty(text))
             return 0;
 
-        var (englishChars, koreanChars, japaneseChars, chineseChars, otherChars) = AnalyzeText(text);
-        var totalChars = englishChars + koreanChars + japaneseChars + chineseChars + otherChars;
-
-        if (totalChars == 0)
+        var classes = Classify(text);
+        if (classes.Total == 0)
             return 0;
 
-        // Calculate weighted token count based on character distribution
         double tokens = 0;
-        tokens += englishChars / _ratios.English;
-        tokens += koreanChars / _ratios.Korean;
-        tokens += japaneseChars / _ratios.Japanese;
-        tokens += chineseChars / _ratios.Chinese;
-        tokens += otherChars / _ratios.Default;
+        tokens += classes.Latin / _ratios.English;
+        tokens += classes.Korean / _ratios.Korean;
+        tokens += classes.Japanese / _ratios.Japanese;
+        tokens += classes.Chinese / _ratios.Chinese;
+        tokens += classes.Digits / _ratios.Digit;
+        tokens += classes.Punctuation / _ratios.Punctuation;
+        tokens += classes.WhitespaceRuns / _ratios.WhitespaceRun;
+        tokens += classes.Other / _ratios.Default;
 
         return (int)Math.Ceiling(tokens);
     }
@@ -70,22 +77,7 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
     }
 
     /// <inheritdoc />
-    public int Count(ChatMessage message)
-    {
-        ArgumentNullException.ThrowIfNull(message);
-
-        var textTokens = 0;
-
-        foreach (var content in message.Contents)
-        {
-            if (content is TextContent textContent && !string.IsNullOrEmpty(textContent.Text))
-            {
-                textTokens += Count(textContent.Text);
-            }
-        }
-
-        return textTokens + MessageOverhead;
-    }
+    public int Count(ChatMessage message) => ChatMessageContents.Count(message, Count, MessageOverhead);
 
     /// <inheritdoc />
     /// <remarks>
@@ -111,42 +103,54 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
         if (string.IsNullOrEmpty(text))
             return DetectedLanguage.Unknown;
 
-        var (english, korean, japanese, chinese, other) = AnalyzeText(text);
-        var total = english + korean + japanese + chinese + other;
+        // The language of the words: digits, punctuation and whitespace say nothing about it
+        var c = Classify(text);
+        var total = c.Latin + c.Korean + c.Japanese + c.Chinese + c.Other;
 
         if (total == 0)
             return DetectedLanguage.Unknown;
 
         // Determine primary language (>50% threshold)
-        if ((double)korean / total > 0.5)
+        if ((double)c.Korean / total > 0.5)
             return DetectedLanguage.Korean;
-        if ((double)japanese / total > 0.5)
+        if ((double)c.Japanese / total > 0.5)
             return DetectedLanguage.Japanese;
-        if ((double)chinese / total > 0.5)
+        if ((double)c.Chinese / total > 0.5)
             return DetectedLanguage.Chinese;
-        if ((double)english / total > 0.5)
+        if ((double)c.Latin / total > 0.5)
             return DetectedLanguage.English;
 
         return DetectedLanguage.Unknown;
     }
 
-    private static (int english, int korean, int japanese, int chinese, int other) AnalyzeText(string text)
+    private readonly record struct CharClasses(
+        int Latin, int Korean, int Japanese, int Chinese, int Digits, int Punctuation, int WhitespaceRuns, int Other)
     {
-        int english = 0, korean = 0, japanese = 0, chinese = 0, other = 0;
+        public int Total => Latin + Korean + Japanese + Chinese + Digits + Punctuation + WhitespaceRuns + Other;
+    }
+
+    private static CharClasses Classify(string text)
+    {
+        int latin = 0, korean = 0, japanese = 0, chinese = 0, digits = 0, punctuation = 0, whitespaceRuns = 0, other = 0;
+        var inWhitespace = false;
 
         foreach (var c in text)
         {
-            var category = CharUnicodeInfo.GetUnicodeCategory(c);
-
-            // Skip whitespace and control characters
-            if (category is UnicodeCategory.SpaceSeparator or
-                UnicodeCategory.LineSeparator or
-                UnicodeCategory.ParagraphSeparator or
-                UnicodeCategory.Control)
+            if (char.IsWhiteSpace(c))
             {
+                // A run of whitespace counts once: a tokenizer merges indentation and line breaks
+                if (!inWhitespace)
+                {
+                    whitespaceRuns++;
+                    inWhitespace = true;
+                }
+
                 continue;
             }
 
+            inWhitespace = false;
+            if (char.IsControl(c))
+                continue;
             if (IsKorean(c))
                 korean++;
             else if (IsJapanese(c))
@@ -154,12 +158,16 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
             else if (IsChinese(c))
                 chinese++;
             else if (IsLatinScript(c))
-                english++;
+                latin++;
+            else if (char.IsDigit(c))
+                digits++;
+            else if (char.IsPunctuation(c) || char.IsSymbol(c))
+                punctuation++;
             else
                 other++;
         }
 
-        return (english, korean, japanese, chinese, other);
+        return new CharClasses(latin, korean, japanese, chinese, digits, punctuation, whitespaceRuns, other);
     }
 
     private static bool IsLatinScript(char c)

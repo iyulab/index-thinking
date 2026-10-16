@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [0.27.0] - Unreleased
+
+### Added
+- **The client's input estimate learns from the provider: `ThinkingChatClientOptions.CalibrateTokenCounts` (default on).**
+  Each response's `Usage.InputTokenCount` is compared with the estimate for the same request, and a moving factor
+  (`ThinkingChatClient.TokenEstimateFactor`, primitive `TokenEstimateCalibration`) scales later estimates for the context
+  check and the output cap — a model whose tokenizer is not o200k (most local models, most on Korean) is no longer
+  undercounted by a steady factor. Requests under 256 estimated tokens are not observed; the factor stays within 0.75–3.
+
+### Changed
+- **Breaking: a message's token count covers everything it sends, and the approximate estimate matches o200k.** Before,
+  `Count(ChatMessage)` (approximate and exact alike) counted only `TextContent`: a tool result or a tool call counted as an
+  empty message (estimate/real 0.006), so the output cap and the input check ignored the bulk of an agent's history. Now a
+  tool call counts its name and arguments, a tool result its payload (a string, a `JsonElement`'s text, the serialized
+  value, or - for a result made of content, such as a screenshot or an MCP tool's text and images - its text and images),
+  reasoning text counts, and each image counts `ApproximateTokenCounter.ImageTokens` (1,000). The approximate
+  counter now counts letters, digits, punctuation and whitespace runs apart, with ratios fitted to o200k_base: on English chat,
+  Korean passages, mixed Korean/English prose, C# and JSON every set's estimate is within 3 % of o200k (before: Korean −25 %,
+  JSON −33 %, C# −13 %). Counts grow for most requests, so the same input can now raise `ContextWindowExceededException`
+  where it passed, and the output cap is lower. `LanguageRatios.English` now means Latin letters only (7.0, was 4.0 over
+  letters and punctuation); new `Digit`, `Punctuation` and `WhitespaceRun` ratios; `Korean` 1.35 (was 1.5). Migration: a
+  custom `LanguageRatios` built for the old meaning should be dropped or refitted; a whitespace-only text now counts 1, not 0.
+- **Breaking: the context check and the output cap count the request's tool definitions.** Each tool's name, description
+  and parameter schema travel with every request (often thousands of tokens for a full tool set) but were not in the
+  estimate, so a request with many tools could pass the check and be capped past the window. The check now raises
+  `ContextWindowExceededException` and the cap lowers `MaxOutputTokens` accordingly.
+
+### Fixed
+- **A comment promised a retry that does not exist.** `CapMaxOutputTokens` said an estimate that still overflows is
+  «handled by catch-and-retry»; nothing retries it — such a request fails with the provider's context error.
+
 ## [0.26.0] - 2026-10-11
 
 ### Removed

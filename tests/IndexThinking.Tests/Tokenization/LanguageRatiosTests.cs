@@ -11,10 +11,13 @@ public class LanguageRatiosTests
     {
         var ratios = LanguageRatios.DefaultRatios;
 
-        ratios.English.Should().Be(4.0);
-        ratios.Korean.Should().Be(1.5);
+        ratios.English.Should().Be(7.0);
+        ratios.Korean.Should().Be(1.35);
         ratios.Japanese.Should().Be(1.5);
         ratios.Chinese.Should().Be(1.2);
+        ratios.Digit.Should().Be(1.3);
+        ratios.Punctuation.Should().Be(1.25);
+        ratios.WhitespaceRun.Should().Be(2.75);
         ratios.Default.Should().Be(3.5);
     }
 
@@ -28,8 +31,8 @@ public class LanguageRatiosTests
     }
 
     [Theory]
-    [InlineData(DetectedLanguage.English, 4.0)]
-    [InlineData(DetectedLanguage.Korean, 1.5)]
+    [InlineData(DetectedLanguage.English, 7.0)]
+    [InlineData(DetectedLanguage.Korean, 1.35)]
     [InlineData(DetectedLanguage.Japanese, 1.5)]
     [InlineData(DetectedLanguage.Chinese, 1.2)]
     [InlineData(DetectedLanguage.Unknown, 3.5)]
