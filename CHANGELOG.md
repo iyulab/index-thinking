@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Added
+- **Over the budget, `ContextBudgetChatReducer` masks old tool results before it drops anything: `ToolResultMasker`.** A
+  result outside the newest three user turns (or, with `protectedTokens`, past a token budget counted from the newest
+  back — the newest round always stays) becomes a placeholder naming the call, its size and how to get it again; the call
+  stays, so the model still knows what it read. `ContextBudgetOptions.Masking` (default on, `null` skips it) and
+  `ContextBudgetOptions.Retention` — an `IToolResultRetention` keeps each masked original and the placeholder names its id
+  and the tool that reads it back instead of asking for the same call (IronHive.Agent's `retrieve_tool_result` is one).
+  Messages are dropped only when masking is not enough. The masker is IronHive.Agent's `ObservationMasker` rule.
+
 ## [0.28.0] - 2026-10-17
 
 ### Added

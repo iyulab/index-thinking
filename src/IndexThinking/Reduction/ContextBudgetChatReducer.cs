@@ -7,7 +7,8 @@ namespace IndexThinking.Reduction;
 
 /// <summary>
 /// Fits one model call's messages into a token budget without breaking tool rounds: a tool result over its limit keeps its
-/// first and last lines (<see cref="ContextBudgetOptions.ToolResults"/>), and when the messages are still over
+/// first and last lines (<see cref="ContextBudgetOptions.ToolResults"/>); over the budget, old tool results are masked
+/// (<see cref="ContextBudgetOptions.Masking"/>), and when the messages are still over
 /// <see cref="ContextBudgetOptions.MaxInputTokens"/> the oldest messages are dropped — a tool round (the assistant message
 /// that calls tools and the results that answer it) always as a whole, so no request carries a call without its result or a
 /// result without its call (which providers reject). Leading system messages, the last user message and the newest message
@@ -53,9 +54,26 @@ public sealed class ContextBudgetChatReducer : IChatReducer
             lead++;
         }
 
-        var units = Units(shortened, lead);
         var tokens = shortened.Sum(Count);
-        if (tokens <= _options.MaxInputTokens || units.Count <= 1)
+        if (tokens <= _options.MaxInputTokens)
+        {
+            return shortened;
+        }
+
+        // Over the budget: first mask old tool results (the calls stay, so the model still knows what it read), and drop
+        // messages only if that is not enough.
+        if (_options.Masking is { } masker)
+        {
+            shortened = masker.Mask(shortened, _options.Retention);
+            tokens = shortened.Sum(Count);
+            if (tokens <= _options.MaxInputTokens)
+            {
+                return shortened;
+            }
+        }
+
+        var units = Units(shortened, lead);
+        if (units.Count <= 1)
         {
             return shortened;
         }
@@ -164,10 +182,5 @@ public sealed class ContextBudgetChatReducer : IChatReducer
         return result ?? messages;
     }
 
-    private static string ResultText(FunctionResultContent result) => result.Result switch
-    {
-        null => string.Empty,
-        string s => s,
-        _ => result.Result.ToString() ?? string.Empty,
-    };
+    private static string ResultText(FunctionResultContent result) => ToolResultTexts.Of(result.Result);
 }
