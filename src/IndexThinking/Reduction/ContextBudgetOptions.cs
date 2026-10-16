@@ -12,10 +12,10 @@ public sealed record ContextBudgetOptions
     public required int MaxInputTokens { get; init; }
 
     /// <summary>
-    /// Longest tool result, in characters, sent whole; a longer one keeps its head and tail with a marker between.
-    /// Default 30 000. <c>null</c> leaves results alone.
+    /// Shortens each tool result over its limit to its first and last lines (default: 30 000 characters, 50 + 20 lines).
+    /// <c>null</c> leaves results alone.
     /// </summary>
-    public int? MaxToolResultChars { get; init; } = 30_000;
+    public ToolResultTrimmer? ToolResults { get; init; } = new();
 
     /// <summary>The counter that measures messages. Default: <see cref="Tokenization.ApproximateTokenCounter"/>.</summary>
     public ITokenCounter? TokenCounter { get; init; }

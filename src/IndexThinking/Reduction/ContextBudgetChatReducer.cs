@@ -6,8 +6,8 @@ using Microsoft.Extensions.AI;
 namespace IndexThinking.Reduction;
 
 /// <summary>
-/// Fits one model call's messages into a token budget without breaking tool rounds: a tool result over
-/// <see cref="ContextBudgetOptions.MaxToolResultChars"/> keeps its head and tail, and when the messages are still over
+/// Fits one model call's messages into a token budget without breaking tool rounds: a tool result over its limit keeps its
+/// first and last lines (<see cref="ContextBudgetOptions.ToolResults"/>), and when the messages are still over
 /// <see cref="ContextBudgetOptions.MaxInputTokens"/> the oldest messages are dropped — a tool round (the assistant message
 /// that calls tools and the results that answer it) always as a whole, so no request carries a call without its result or a
 /// result without its call (which providers reject). Leading system messages, the last user message and the newest message
@@ -31,10 +31,6 @@ public sealed class ContextBudgetChatReducer : IChatReducer
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxInputTokens, nameof(options));
-        if (options.MaxToolResultChars is { } max)
-        {
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(max, nameof(options));
-        }
 
         _options = options;
         _counter = options.TokenCounter ?? new ApproximateTokenCounter();
@@ -49,7 +45,7 @@ public sealed class ContextBudgetChatReducer : IChatReducer
 
     internal IReadOnlyList<ChatMessage> Reduce(IReadOnlyList<ChatMessage> messages)
     {
-        var shortened = _options.MaxToolResultChars is { } maxChars ? ShortenToolResults(messages, maxChars) : messages;
+        var shortened = _options.ToolResults is { } trimmer ? ShortenToolResults(messages, trimmer) : messages;
 
         var lead = 0;
         while (lead < shortened.Count && shortened[lead].Role == ChatRole.System)
@@ -146,18 +142,18 @@ public sealed class ContextBudgetChatReducer : IChatReducer
     private static ChatMessage OmissionNote(int droppedMessages) => new(ChatRole.User, string.Create(CultureInfo.InvariantCulture,
         $"[{droppedMessages} earlier messages omitted to fit the context window]"));
 
-    private static IReadOnlyList<ChatMessage> ShortenToolResults(IReadOnlyList<ChatMessage> messages, int maxChars)
+    private static IReadOnlyList<ChatMessage> ShortenToolResults(IReadOnlyList<ChatMessage> messages, ToolResultTrimmer trimmer)
     {
         List<ChatMessage>? result = null;
         for (var i = 0; i < messages.Count; i++)
         {
             var message = messages[i];
-            if (message.Role == ChatRole.Tool && message.Contents.Any(c => c is FunctionResultContent r && ResultText(r).Length > maxChars))
+            if (message.Role == ChatRole.Tool && message.Contents.Any(c => c is FunctionResultContent r && ResultText(r).Length > trimmer.MaxChars))
             {
                 result ??= [.. messages.Take(i)];
                 result.Add(new ChatMessage(ChatRole.Tool, [.. message.Contents.Select(c =>
-                    c is FunctionResultContent r && ResultText(r) is { } text && text.Length > maxChars
-                        ? new FunctionResultContent(r.CallId, HeadAndTail(text, maxChars))
+                    c is FunctionResultContent r && ResultText(r) is { } text && text.Length > trimmer.MaxChars
+                        ? new FunctionResultContent(r.CallId, trimmer.Trim(text))
                         : c)]));
                 continue;
             }
@@ -174,28 +170,4 @@ public sealed class ContextBudgetChatReducer : IChatReducer
         string s => s,
         _ => result.Result.ToString() ?? string.Empty,
     };
-
-    /// <summary>The first and last parts of <paramref name="text"/> within <paramref name="maxChars"/>, cut at line ends where possible.</summary>
-    internal static string HeadAndTail(string text, int maxChars)
-    {
-        var marker = string.Create(CultureInfo.InvariantCulture, $"\n[... {text.Length - maxChars:N0} of {text.Length:N0} characters omitted ...]\n");
-        var keep = Math.Max(0, maxChars - marker.Length);
-        var headLength = keep * 2 / 3;
-        var tailLength = keep - headLength;
-        var head = text[..headLength];
-        var tail = text[^tailLength..];
-        var headCut = head.LastIndexOf('\n');
-        if (headCut > headLength / 2)
-        {
-            head = head[..headCut];
-        }
-
-        var tailCut = tail.IndexOf('\n');
-        if (tailCut >= 0 && tailCut < tailLength / 2)
-        {
-            tail = tail[(tailCut + 1)..];
-        }
-
-        return string.Concat(head, marker, tail);
-    }
 }

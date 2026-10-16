@@ -32,8 +32,8 @@ public class ContextBudgetChatReducerTests
         return messages;
     }
 
-    private static async Task<List<ChatMessage>> ReduceAsync(IEnumerable<ChatMessage> messages, int maxTokens, int? maxToolResultChars = 30_000) =>
-        [.. await new ContextBudgetChatReducer(new ContextBudgetOptions { MaxInputTokens = maxTokens, MaxToolResultChars = maxToolResultChars })
+    private static async Task<List<ChatMessage>> ReduceAsync(IEnumerable<ChatMessage> messages, int maxTokens, ToolResultTrimmer? trimmer = null) =>
+        [.. await new ContextBudgetChatReducer(new ContextBudgetOptions { MaxInputTokens = maxTokens, ToolResults = trimmer ?? new ToolResultTrimmer() })
             .ReduceAsync(messages, Ct)];
 
     private static void AssertEveryCallHasItsResultAndEveryResultItsCall(IReadOnlyList<ChatMessage> request)
@@ -112,11 +112,28 @@ public class ContextBudgetChatReducerTests
             new(ChatRole.Tool, [new FunctionResultContent("a", long_)]),
         };
 
-        var reduced = await ReduceAsync(messages, 1_000_000, maxToolResultChars: 2_000);
+        var reduced = await ReduceAsync(messages, 1_000_000, new ToolResultTrimmer(maxChars: 2_000, keepHeadLines: 5, keepTailLines: 3));
 
         var text = reduced[2].Contents.OfType<FunctionResultContent>().Single().Result!.ToString()!;
-        text.Length.Should().BeLessThanOrEqualTo(2_000);
-        text.Should().StartWith("line 0").And.EndWith("line 1999").And.Contain("characters omitted");
+        text.Should().StartWith("line 0\nline 1").And.EndWith("line 1997\nline 1998\nline 1999").And.Contain("[... 1,992 lines omitted");
+    }
+
+    [Theory]
+    [InlineData(100, true)]
+    [InlineData(101, false)]
+    public void TheTrimmer_KeepsASmallResultWhole_AndCutsAOneLineResultAtTheLimit(int length, bool whole)
+    {
+        var text = new string('x', length);
+        var trimmed = new ToolResultTrimmer(maxChars: 100).Trim(text);
+
+        if (whole)
+        {
+            trimmed.Should().BeSameAs(text);
+        }
+        else
+        {
+            trimmed.Should().StartWith(new string('x', 100)).And.EndWith("[... truncated (101 chars total) ...]");
+        }
     }
 
     [Fact]

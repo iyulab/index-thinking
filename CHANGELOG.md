@@ -8,8 +8,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ### Added
 - **Fit a request into a token budget without breaking tool rounds: `ContextBudgetChatReducer`.** An M.E.AI `IChatReducer`
-  (`ChatClientBuilder.UseChatReducer(…)`) for any `IChatClient` pipeline: a tool result over `MaxToolResultChars` (30 000)
-  keeps its head and tail, and while the request is over `MaxInputTokens` the oldest messages are dropped — an assistant
+  (`ChatClientBuilder.UseChatReducer(…)`) for any `IChatClient` pipeline: a tool result over its limit keeps its first and
+  last lines (`ContextBudgetOptions.ToolResults`, a `ToolResultTrimmer` — 30 000 characters, 50 + 20 lines; the same rule
+  as IronHive.Agent's tool-result compaction), and while the request is over `MaxInputTokens` the oldest messages are dropped — an assistant
   message that calls tools always together with the results that answer it, so no request carries a call without its result
   or a result without its call (M.E.AI's own reducers count messages and can split them). System messages, the last user
   message and the newest message or round stay; each dropped run is replaced by one note where it was. The caller's history
