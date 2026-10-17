@@ -10,7 +10,7 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <Version>0.29.0</Version>
+    <Version>0.30.0</Version>
     <!-- nuget.org «Release Notes»: the GitHub release of this version (its notes are the CHANGELOG section). -->
     <PackageReleaseNotes>https://github.com/iyulab/index-thinking/releases/tag/v$(Version)</PackageReleaseNotes>
   </PropertyGroup>
