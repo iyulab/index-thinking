@@ -37,6 +37,7 @@ public sealed class ToolResultMasker
     private readonly int _protectedTurns;
     private readonly int _minimumResultLength;
     private readonly int? _protectedTokens;
+    private readonly int _minimumClearTokens;
 
     /// <summary>Creates a masker.</summary>
     /// <param name="protectedTurns">Newest user turns whose results stay (a turn runs from a user message to the next). Default 3.</param>
@@ -45,11 +46,25 @@ public sealed class ToolResultMasker
     /// Token budget for the newest results, counted from the newest back across turns: results past it are masked even in a
     /// protected turn — one user message followed by many tool rounds keeps only what fits. <c>null</c> (default): off.
     /// </param>
-    /// <param name="tokenCounter">Counts results against <paramref name="protectedTokens"/>. Default: <see cref="ApproximateTokenCounter"/>.</param>
-    public ToolResultMasker(int protectedTurns = 3, int minimumResultLength = 200, int? protectedTokens = null, ITokenCounter? tokenCounter = null)
+    /// <param name="tokenCounter">
+    /// Counts results against <paramref name="protectedTokens"/> and <paramref name="minimumClearTokens"/>. Default:
+    /// <see cref="ApproximateTokenCounter"/>.
+    /// </param>
+    /// <param name="minimumClearTokens">
+    /// Mask only when the results that would be masked add up to at least this many tokens; otherwise leave the history as
+    /// it is. Masking changes the prompt from the first masked result on, so a provider's prompt cache misses from there:
+    /// a new turn moves the protection boundary by one turn, and masking at every move makes every turn miss. With a
+    /// threshold the results wait past the boundary until masking them is worth the miss (the same trade-off as
+    /// Anthropic's context-editing <c>clear_at_least</c>). Results already masked do not count. 0 (default): mask at
+    /// every move.
+    /// </param>
+    public ToolResultMasker(
+        int protectedTurns = 3, int minimumResultLength = 200, int? protectedTokens = null, ITokenCounter? tokenCounter = null,
+        int minimumClearTokens = 0)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(protectedTurns);
         ArgumentOutOfRangeException.ThrowIfNegative(minimumResultLength);
+        ArgumentOutOfRangeException.ThrowIfNegative(minimumClearTokens);
         if (protectedTokens is { } tokens)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(tokens, nameof(protectedTokens));
@@ -58,6 +73,7 @@ public sealed class ToolResultMasker
         _protectedTurns = protectedTurns;
         _minimumResultLength = minimumResultLength;
         _protectedTokens = protectedTokens;
+        _minimumClearTokens = minimumClearTokens;
         _counter = tokenCounter ?? new ApproximateTokenCounter();
     }
 
@@ -80,6 +96,13 @@ public sealed class ToolResultMasker
             return messages;
         }
 
+        bool ShouldMask(int index, FunctionResultContent r) => index < turnStart || (overBudget is not null && overBudget.Contains(r));
+
+        if (_minimumClearTokens > 0 && MaskableTokens(messages, ShouldMask) < _minimumClearTokens)
+        {
+            return messages;
+        }
+
         var calls = CallsById(messages);
         var result = new List<ChatMessage>(messages.Count);
         var anyMasked = false;
@@ -92,14 +115,45 @@ public sealed class ToolResultMasker
                 continue;
             }
 
-            var maskAll = i < turnStart;
-            var masked = MaskToolMessage(message, calls, r => maskAll || (overBudget is not null && overBudget.Contains(r)), retention);
+            var index = i;
+            var masked = MaskToolMessage(message, calls, r => ShouldMask(index, r), retention);
             result.Add(masked);
             anyMasked |= !ReferenceEquals(masked, message);
         }
 
         return anyMasked ? result : messages;
     }
+
+    // The tokens a Mask call would take out: the results it would replace, placeholders it made on an earlier request excluded.
+    private int MaskableTokens(IReadOnlyList<ChatMessage> messages, Func<int, FunctionResultContent, bool> shouldMask)
+    {
+        var total = 0;
+        for (var i = 0; i < messages.Count; i++)
+        {
+            if (messages[i].Role != ChatRole.Tool)
+            {
+                continue;
+            }
+
+            foreach (var result in messages[i].Contents.OfType<FunctionResultContent>())
+            {
+                var text = ToolResultTexts.Of(result.Result);
+                if (shouldMask(i, result) && IsMaskable(text))
+                {
+                    total += _counter.Count(text);
+                }
+            }
+        }
+
+        return total;
+    }
+
+    // A placeholder is never masked again: a loop stores the prepared history, so the next request sees placeholders it made
+    // itself, and one with long arguments is longer than the minimum length.
+    private bool IsMaskable(string text) =>
+        text.Length >= _minimumResultLength && !text.StartsWith(PlaceholderPrefix, StringComparison.Ordinal);
+
+    private const string PlaceholderPrefix = "[Masked: ";
 
     private static Dictionary<string, FunctionCallContent> CallsById(IReadOnlyList<ChatMessage> messages)
     {
@@ -201,7 +255,7 @@ public sealed class ToolResultMasker
             if (content is FunctionResultContent result && shouldMask(result))
             {
                 var text = ToolResultTexts.Of(result.Result);
-                if (text.Length >= _minimumResultLength)
+                if (IsMaskable(text))
                 {
                     masked ??= [.. message.Contents.Take(i)];
                     var id = retention?.Retain(result, text);
@@ -230,7 +284,7 @@ public sealed class ToolResultMasker
                 ? $"call {toolName} again with the same arguments if you need it"
                 : "repeat the call that produced it if you need it";
         return string.Create(CultureInfo.InvariantCulture,
-            $"[Masked: {invocation} result, {text.Length:N0} chars, ~{lineCount} lines. The content is no longer visible here; {again}.]");
+            $"{PlaceholderPrefix}{invocation} result, {text.Length:N0} chars, ~{lineCount} lines. The content is no longer visible here; {again}.]");
     }
 
     private static string FormatArguments(FunctionCallContent? call)

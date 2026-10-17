@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Added
+- **`ToolResultMasker` can wait until masking is worth a prompt-cache miss: `minimumClearTokens`.** Masking changes the
+  prompt from the first masked result on, and each new turn moves the protection boundary by one turn — so masking at every
+  move makes a provider's prompt cache miss on every turn. With `minimumClearTokens` the masker leaves the history as it is
+  until the results it would mask add up to that many tokens, then masks them together (the trade-off Anthropic's context
+  editing calls `clear_at_least`). Results already masked do not count. Default 0: as before.
+
+### Fixed
+- **A masked tool result stays masked as it was.** A loop that stores the prepared history hands the masker its own
+  placeholders on the next request; a placeholder with long arguments is longer than `minimumResultLength`, and it was masked
+  again — the new placeholder described the placeholder («230 chars») instead of the result, and the prompt changed at that
+  result once more. Placeholders are now left alone.
+
 ## [0.29.0] - 2026-10-17
 
 ### Added

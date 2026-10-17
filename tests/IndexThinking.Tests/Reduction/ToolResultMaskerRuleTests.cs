@@ -1,3 +1,4 @@
+using IndexThinking.Abstractions;
 using IndexThinking.Reduction;
 using Microsoft.Extensions.AI;
 using Xunit;
@@ -382,6 +383,93 @@ public class ToolResultMaskerRuleTests
     #endregion
 
     #region Helper Methods
+
+    #region Stored history
+
+    [Fact]
+    public void MaskObservations_AnAlreadyMaskedResult_IsLeftAsItIs()
+    {
+        // A loop stores the prepared history, so the next request masks placeholders it made itself. A placeholder with long
+        // arguments is longer than the minimum length; masking it again would describe the placeholder, not the result.
+        var masker = new ToolResultMasker(protectedTurns: 1, minimumResultLength: 50);
+        var arguments = new Dictionary<string, object?> { ["path"] = "src/" + new string('a', 150) + ".cs" };
+        var history = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Read the file"),
+            new(ChatRole.Assistant, [new FunctionCallContent("call-1", "read_file", arguments)]),
+            CreateToolResult("call-1", new string('x', 5000)),
+            new(ChatRole.User, "Thanks"),
+        };
+
+        var once = masker.Mask(history);
+        var twice = masker.Mask(once);
+
+        Assert.Same(once, twice);
+        Assert.Contains("5,000 chars", once[2].Contents.OfType<FunctionResultContent>().Single().Result?.ToString());
+    }
+
+    [Fact]
+    public void MaskObservations_WithAClearThreshold_WaitsUntilEnoughIsLeftToMask()
+    {
+        // Each new turn moves the protection boundary by one turn; masking at every move changes the prompt prefix every
+        // turn. With minimumClearTokens the masker waits until the results past the boundary are worth that change.
+        var masker = new ToolResultMasker(protectedTurns: 1, minimumResultLength: 50, minimumClearTokens: 2_000,
+            tokenCounter: new CharCounter());
+        var history = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Read a"),
+            CreateAssistantWithToolCall("call-1", "read_file"),
+            CreateToolResult("call-1", new string('a', 1_500)),
+            new(ChatRole.User, "Read b"),
+        };
+
+        Assert.Same(history, masker.Mask(history));
+
+        history.Add(CreateAssistantWithToolCall("call-2", "read_file"));
+        history.Add(CreateToolResult("call-2", new string('b', 1_500)));
+        history.Add(new ChatMessage(ChatRole.User, "Read c"));
+        var masked = masker.Mask(history);
+
+        Assert.NotSame(history, masked);
+        Assert.All(masked.Where(m => m.Role == ChatRole.Tool),
+            m => Assert.Contains("[Masked:", m.Contents.OfType<FunctionResultContent>().Single().Result?.ToString()));
+    }
+
+    [Fact]
+    public void MaskObservations_AClearThreshold_DoesNotCountResultsAlreadyMasked()
+    {
+        var masker = new ToolResultMasker(protectedTurns: 1, minimumResultLength: 50, minimumClearTokens: 2_000,
+            tokenCounter: new CharCounter());
+        var history = new List<ChatMessage>
+        {
+            new(ChatRole.User, "Read a"),
+            CreateAssistantWithToolCall("call-1", "read_file"),
+            CreateToolResult("call-1", new string('a', 2_500)),
+            new(ChatRole.User, "Read b"),
+            CreateAssistantWithToolCall("call-2", "read_file"),
+            CreateToolResult("call-2", new string('b', 1_000)),
+            new(ChatRole.User, "Read c"),
+        };
+
+        // The first request masks both (3,500 past the boundary); the stored placeholders do not count towards the next one
+        var stored = masker.Mask(history).ToList();
+        stored.Add(CreateAssistantWithToolCall("call-3", "read_file"));
+        stored.Add(CreateToolResult("call-3", new string('c', 1_000)));
+        stored.Add(new ChatMessage(ChatRole.User, "Read d"));
+
+        Assert.Same(stored, masker.Mask(stored));
+    }
+
+    private sealed class CharCounter : ITokenCounter
+    {
+        public int Count(string text) => text.Length;
+
+        public int Count(IEnumerable<string> texts) => texts.Sum(t => t.Length);
+
+        public bool SupportsModel(string modelId) => true;
+    }
+
+    #endregion
 
     private static ChatMessage CreateAssistantWithToolCall(string callId, string toolName)
     {
