@@ -12,7 +12,9 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   move makes a provider's prompt cache miss on every turn. With `minimumClearTokens` the masker leaves the history as it is
   until the results it would mask add up to that many tokens, then masks them together (the trade-off Anthropic's context
   editing calls `clear_at_least`). Results already masked do not count. It applies to the turn boundary only — a
-  `protectedTokens` budget is a limit and always holds. Default 0: as before.
+  `protectedTokens` budget is a limit and always holds. Default 0: as before. **Breaking** (binary): the constructor gained the parameter,
+  so a package compiled against 0.29.0 that constructs a masker needs a rebuild — IronHive.Agent 0.65.0 does; take IronHive.Agent
+  0.66.0 with this release.
 
 ### Fixed
 - **A masked tool result stays masked as it was.** A loop that stores the prepared history hands the masker its own
