@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace IndexThinking.Reduction;
 
@@ -7,7 +8,7 @@ namespace IndexThinking.Reduction;
 /// the start of a result (headers, the first matches) and its end (totals, the final error) are what a model usually
 /// needs. A result without enough lines is cut at the limit instead.
 /// </summary>
-public sealed class ToolResultTrimmer
+public sealed partial class ToolResultTrimmer
 {
     /// <summary>Creates a trimmer.</summary>
     /// <param name="maxChars">Longest result, in characters, kept whole. Default 30 000.</param>
@@ -36,13 +37,14 @@ public sealed class ToolResultTrimmer
     /// <summary>
     /// <paramref name="text"/> itself when it is within <see cref="MaxChars"/>; otherwise its first and last lines around a
     /// «lines omitted» marker, or — when it has too few lines for that — its first <see cref="MaxChars"/> characters and a
-    /// «truncated» marker. The result is within <see cref="MaxChars"/> (unless the marker alone is longer), so trimming it
-    /// again returns it unchanged — a loop that stores what it sent hands it back on the next request.
+    /// «truncated» marker. A text that already carries one of those markers is returned as it is — a loop that stores what
+    /// it sent hands a trimmed result back on the next request, and it can still be over the limit (the marker is added after
+    /// the cut, and kept lines can be long); trimming it again would describe the trimmed text, not the result.
     /// </summary>
     public string Trim(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        if (text.Length <= MaxChars)
+        if (text.Length <= MaxChars || TrimMarker().IsMatch(text))
         {
             return text;
         }
@@ -51,19 +53,18 @@ public sealed class ToolResultTrimmer
         var keep = KeepHeadLines + KeepTailLines;
         if (lines.Length > keep && keep > 0)
         {
-            var byLines = string.Concat(
+            return string.Concat(
                 string.Join('\n', lines.AsSpan(0, KeepHeadLines).ToArray()),
                 string.Create(CultureInfo.InvariantCulture, $"\n\n[... {lines.Length - keep:N0} lines omitted ({text.Length:N0} chars total) ...]\n\n"),
                 string.Join('\n', lines.AsSpan(lines.Length - KeepTailLines).ToArray()));
-            if (byLines.Length <= MaxChars)
-            {
-                return byLines;
-            }
         }
 
-        // Too few lines, or lines so long that the head and tail alone are over the limit: the first characters, with room
-        // left for the marker
-        var marker = string.Create(CultureInfo.InvariantCulture, $"\n[... truncated ({text.Length:N0} chars total) ...]");
-        return string.Concat(text.AsSpan(0, Math.Max(0, MaxChars - marker.Length)), marker);
+        return string.Concat(
+            text.AsSpan(0, MaxChars),
+            string.Create(CultureInfo.InvariantCulture, $"\n[... truncated ({text.Length:N0} chars total) ...]"));
     }
+
+    // The two markers Trim writes, as it writes them (N0 under the invariant culture).
+    [GeneratedRegex(@"\n\[\.\.\. (?:[\d,]+ lines omitted|truncated) \([\d,]+ chars total\) \.\.\.\]")]
+    private static partial Regex TrimMarker();
 }

@@ -4,8 +4,8 @@ using Xunit;
 namespace IndexThinking.Tests.Reduction;
 
 /// <summary>
-/// <see cref="ToolResultTrimmer"/> — a loop stores what it sent, so the trimmer is handed its own output on the next request:
-/// that output has to be within the limit, or it is trimmed again and the marker's total describes the trimmed text.
+/// <see cref="ToolResultTrimmer"/> — a loop stores what it sent, so the trimmer is handed its own output on the next request;
+/// trimming it again would make the marker's total describe the trimmed text.
 /// </summary>
 public class ToolResultTrimmerTests
 {
@@ -25,7 +25,7 @@ public class ToolResultTrimmerTests
     [Theory]
     [InlineData(1)]   // one long line: the character cut
     [InlineData(80)]  // more lines than head + tail, each long: head + tail alone are over the limit
-    public void Trim_OutputIsWithinTheLimit_AndTrimmingItAgainChangesNothing(int lineCount)
+    public void Trim_TrimmingItsOwnOutputAgain_ChangesNothing(int lineCount)
     {
         var trimmer = new ToolResultTrimmer(maxChars: 2_000, keepHeadLines: 50, keepTailLines: 20);
         var text = string.Join('\n', Enumerable.Range(1, lineCount).Select(i => new string((char)('a' + i % 26), 6_000 / lineCount + 100)));
@@ -33,8 +33,8 @@ public class ToolResultTrimmerTests
         var once = trimmer.Trim(text);
         var twice = trimmer.Trim(once);
 
-        Assert.True(once.Length <= trimmer.MaxChars, $"{once.Length} > {trimmer.MaxChars}");
-        Assert.Equal(once, twice);
+        Assert.True(once.Length > trimmer.MaxChars, "the case under test: the trimmed text is still over the limit");
+        Assert.Same(once, twice);
         Assert.Contains($"({text.Length:N0} chars total)", once, StringComparison.Ordinal);
     }
 
