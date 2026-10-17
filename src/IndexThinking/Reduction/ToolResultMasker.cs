@@ -55,7 +55,8 @@ public sealed class ToolResultMasker
     /// it is. Masking changes the prompt from the first masked result on, so a provider's prompt cache misses from there:
     /// a new turn moves the protection boundary by one turn, and masking at every move makes every turn miss. With a
     /// threshold the results wait past the boundary until masking them is worth the miss (the same trade-off as
-    /// Anthropic's context-editing <c>clear_at_least</c>). Results already masked do not count. 0 (default): mask at
+    /// Anthropic's context-editing <c>clear_at_least</c>). Results already masked do not count. It applies to the turn
+    /// boundary only: a <paramref name="protectedTokens"/> budget is a limit and is always enforced. 0 (default): mask at
     /// every move.
     /// </param>
     public ToolResultMasker(
@@ -96,12 +97,17 @@ public sealed class ToolResultMasker
             return messages;
         }
 
-        bool ShouldMask(int index, FunctionResultContent r) => index < turnStart || (overBudget is not null && overBudget.Contains(r));
-
-        if (_minimumClearTokens > 0 && MaskableTokens(messages, ShouldMask) < _minimumClearTokens)
+        // The turn boundary waits for minimumClearTokens; a protectedTokens budget is a limit the caller set and always holds
+        if (_minimumClearTokens > 0 && turnStart > 0 && MaskableTokens(messages, (i, _) => i < turnStart) < _minimumClearTokens)
         {
-            return messages;
+            turnStart = 0;
+            if (overBudget is null || overBudget.Count == 0)
+            {
+                return messages;
+            }
         }
+
+        bool ShouldMask(int index, FunctionResultContent r) => index < turnStart || (overBudget is not null && overBudget.Contains(r));
 
         var calls = CallsById(messages);
         var result = new List<ChatMessage>(messages.Count);

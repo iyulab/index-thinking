@@ -460,6 +460,25 @@ public class ToolResultMaskerRuleTests
         Assert.Same(stored, masker.Mask(stored));
     }
 
+    [Fact]
+    public void MaskObservations_AClearThreshold_LeavesATokenBudgetEnforced()
+    {
+        // protectedTokens is a limit the caller set: results past it are masked even when they add up to less than the threshold
+        var masker = new ToolResultMasker(protectedTurns: 3, minimumResultLength: 50, protectedTokens: 1_200, minimumClearTokens: 10_000,
+            tokenCounter: new CharCounter());
+        var history = new List<ChatMessage> { new(ChatRole.User, "Read every part") };
+        for (var r = 1; r <= 3; r++)
+        {
+            history.Add(CreateAssistantWithToolCall($"call-{r}", "read_file"));
+            history.Add(CreateToolResult($"call-{r}", new string('p', 1_000)));
+        }
+
+        var masked = masker.Mask(history);
+
+        Assert.Contains("[Masked:", masked[2].Contents.OfType<FunctionResultContent>().Single().Result?.ToString());
+        Assert.DoesNotContain("[Masked:", masked[6].Contents.OfType<FunctionResultContent>().Single().Result?.ToString());
+    }
+
     private sealed class CharCounter : ITokenCounter
     {
         public int Count(string text) => text.Length;

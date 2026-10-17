@@ -11,7 +11,8 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   prompt from the first masked result on, and each new turn moves the protection boundary by one turn — so masking at every
   move makes a provider's prompt cache miss on every turn. With `minimumClearTokens` the masker leaves the history as it is
   until the results it would mask add up to that many tokens, then masks them together (the trade-off Anthropic's context
-  editing calls `clear_at_least`). Results already masked do not count. Default 0: as before.
+  editing calls `clear_at_least`). Results already masked do not count. It applies to the turn boundary only — a
+  `protectedTokens` budget is a limit and always holds. Default 0: as before.
 
 ### Fixed
 - **A masked tool result stays masked as it was.** A loop that stores the prepared history hands the masker its own
