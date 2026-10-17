@@ -18,6 +18,11 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   placeholders on the next request; a placeholder with long arguments is longer than `minimumResultLength`, and it was masked
   again — the new placeholder described the placeholder («230 chars») instead of the result, and the prompt changed at that
   result once more. Placeholders are now left alone.
+- **`ToolResultTrimmer`'s output fits `MaxChars`, so trimming it again changes nothing.** A one-line result was cut at
+  `MaxChars` and then given its marker, and a result whose kept head and tail lines were long came out over the limit too;
+  a loop that stores what it sent trimmed it again on the next request and the marker's «chars total» then described the
+  trimmed text. The character cut now leaves room for the marker, and a line trim that would still be over the limit falls
+  back to it.
 
 ## [0.29.0] - 2026-10-17
 

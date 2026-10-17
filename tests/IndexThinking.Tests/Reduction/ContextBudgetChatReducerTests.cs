@@ -121,7 +121,7 @@ public class ContextBudgetChatReducerTests
     [Theory]
     [InlineData(100, true)]
     [InlineData(101, false)]
-    public void TheTrimmer_KeepsASmallResultWhole_AndCutsAOneLineResultAtTheLimit(int length, bool whole)
+    public void TheTrimmer_KeepsASmallResultWhole_AndCutsAOneLineResultToFitTheLimit(int length, bool whole)
     {
         var text = new string('x', length);
         var trimmed = new ToolResultTrimmer(maxChars: 100).Trim(text);
@@ -132,7 +132,9 @@ public class ContextBudgetChatReducerTests
         }
         else
         {
-            trimmed.Should().StartWith(new string('x', 100)).And.EndWith("[... truncated (101 chars total) ...]");
+            // Marker included, the result fits the limit — trimming it again changes nothing
+            trimmed.Length.Should().BeLessThanOrEqualTo(100);
+            trimmed.Should().StartWith("xxxxxxxxxx").And.EndWith("[... truncated (101 chars total) ...]");
         }
     }
 

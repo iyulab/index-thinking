@@ -36,7 +36,8 @@ public sealed class ToolResultTrimmer
     /// <summary>
     /// <paramref name="text"/> itself when it is within <see cref="MaxChars"/>; otherwise its first and last lines around a
     /// «lines omitted» marker, or — when it has too few lines for that — its first <see cref="MaxChars"/> characters and a
-    /// «truncated» marker.
+    /// «truncated» marker. The result is within <see cref="MaxChars"/> (unless the marker alone is longer), so trimming it
+    /// again returns it unchanged — a loop that stores what it sent hands it back on the next request.
     /// </summary>
     public string Trim(string text)
     {
@@ -50,14 +51,19 @@ public sealed class ToolResultTrimmer
         var keep = KeepHeadLines + KeepTailLines;
         if (lines.Length > keep && keep > 0)
         {
-            return string.Concat(
+            var byLines = string.Concat(
                 string.Join('\n', lines.AsSpan(0, KeepHeadLines).ToArray()),
                 string.Create(CultureInfo.InvariantCulture, $"\n\n[... {lines.Length - keep:N0} lines omitted ({text.Length:N0} chars total) ...]\n\n"),
                 string.Join('\n', lines.AsSpan(lines.Length - KeepTailLines).ToArray()));
+            if (byLines.Length <= MaxChars)
+            {
+                return byLines;
+            }
         }
 
-        return string.Concat(
-            text.AsSpan(0, MaxChars),
-            string.Create(CultureInfo.InvariantCulture, $"\n[... truncated ({text.Length:N0} chars total) ...]"));
+        // Too few lines, or lines so long that the head and tail alone are over the limit: the first characters, with room
+        // left for the marker
+        var marker = string.Create(CultureInfo.InvariantCulture, $"\n[... truncated ({text.Length:N0} chars total) ...]");
+        return string.Concat(text.AsSpan(0, Math.Max(0, MaxChars - marker.Length)), marker);
     }
 }
