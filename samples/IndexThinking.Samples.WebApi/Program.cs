@@ -12,7 +12,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configure IndexThinking services
 builder.Services.AddIndexThinkingAgents();
-builder.Services.AddIndexThinkingContext();
 builder.Services.AddIndexThinkingInMemoryStorage();
 builder.Services.AddIndexThinkingMetrics();
 
@@ -44,7 +43,7 @@ app.MapPost("/api/chat", async (ChatRequest request, IChatClient chatClient) =>
     
     var options = new ChatOptions();
     options.AdditionalProperties ??= [];
-    options.AdditionalProperties["SessionId"] = request.SessionId ?? Guid.NewGuid().ToString("N")[..8];
+    options.AdditionalProperties[ThinkingChatClientExtensions.SessionIdKey] = request.SessionId ?? Guid.NewGuid().ToString("N")[..8];
     
     var response = await chatClient.GetResponseAsync(messages, options);
     

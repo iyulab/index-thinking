@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Changed
+- **Breaking: the client no longer tracks or injects a session's history by default.** `ThinkingChatClientOptions.EnableContextTracking`
+  and `EnableContextInjection` now default to `false`, so a client keeps no conversation state unless asked to; send the history
+  you want the model to see, and fit it to the window with `ContextBudgetChatReducer`. Migration: to keep the session tracker
+  registered by `AddIndexThinkingContext`, set both options to `true`. The tracker and injector are planned for removal in a
+  later minor release.
+
+### Fixed
+- **Injected history no longer carries a tool call without its result.** When a function-invoking client sat outside the
+  thinking client, a tracked turn held each round's call alone, and the next request in that session sent the call with no
+  result — which providers reject. Past turns are now injected as their user messages and response text; their tool calls and
+  results are left out (they also no longer fill the window). The tracked turns themselves are not changed.
+
 ## [0.31.0] - 2026-10-18
 
 ### Added

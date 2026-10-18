@@ -79,16 +79,9 @@ public sealed class DefaultContextInjector : IContextInjector
 
         foreach (var turn in turnsToInclude)
         {
-            // Add user message from history
-            result.Add(turn.UserMessage);
-
-            // Add assistant response if available
-            if (turn.AssistantResponse?.Messages != null)
+            foreach (var message in HistoryMessages(turn))
             {
-                foreach (var assistantMessage in turn.AssistantResponse.Messages)
-                {
-                    result.Add(assistantMessage);
-                }
+                result.Add(message);
             }
         }
 
@@ -99,6 +92,53 @@ public sealed class DefaultContextInjector : IContextInjector
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// The messages a past turn contributes to a request: its user message and the text of its response.
+    /// </summary>
+    /// <remarks>
+    /// Tool calls and tool results are left out. A tracked turn can hold a call without its result (when a function-invoking
+    /// client sits outside this one, each round's response is the call alone), and a provider rejects a request whose call
+    /// has no result. Dropping both keeps the history valid whatever the pipeline order, and keeps the large tool results of
+    /// past turns out of the window. Messages are copied, so the tracked turn is never changed.
+    /// </remarks>
+    private static IEnumerable<ChatMessage> HistoryMessages(ConversationTurn turn)
+    {
+        if (TextOnly(turn.UserMessage) is { } user)
+        {
+            yield return user;
+        }
+
+        if (turn.AssistantResponse?.Messages is not { } responseMessages)
+        {
+            yield break;
+        }
+
+        foreach (var message in responseMessages)
+        {
+            if (message.Role != ChatRole.Tool && TextOnly(message) is { } text)
+            {
+                yield return text;
+            }
+        }
+    }
+
+    private static ChatMessage? TextOnly(ChatMessage message)
+    {
+        var contents = message.Contents
+            .Where(c => c is not FunctionCallContent and not FunctionResultContent)
+            .ToList();
+        if (contents.Count == 0)
+        {
+            return null;
+        }
+
+        return new ChatMessage(message.Role, contents)
+        {
+            AuthorName = message.AuthorName,
+            MessageId = message.MessageId,
+        };
     }
 
     /// <summary>
@@ -128,14 +168,10 @@ public sealed class DefaultContextInjector : IContextInjector
         for (var i = turns.Count - 1; i >= 0; i--)
         {
             var turn = turns[i];
-            var turnTokens = _tokenCounter!.CountMessage(turn.UserMessage);
-
-            if (turn.AssistantResponse?.Messages != null)
+            var turnTokens = 0;
+            foreach (var msg in HistoryMessages(turn))
             {
-                foreach (var msg in turn.AssistantResponse.Messages)
-                {
-                    turnTokens += _tokenCounter!.CountMessage(msg);
-                }
+                turnTokens += _tokenCounter!.CountMessage(msg);
             }
 
             if (turnTokens > remainingBudget)

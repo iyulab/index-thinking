@@ -29,7 +29,7 @@ Each row: what it does · entry point · how to turn it on. "Default" means the 
 | Turn metrics | `response.GetTurnMetrics()` / `GetTurnResult()`; on a stream, the final update's `AdditionalProperties[ThinkingChatClient.TurnResultKey]` | Default (`IncludeMetricsInMetadata = true`) |
 | Reasoning activation for DeepSeek / Qwen / vLLM / GPUStack | `ReasoningRequestModifierRegistry.Default` | Opt-in: `ThinkingChatClientOptions.EnableReasoning = true` (`AutoDetectReasoningRequirement` keeps it to models that need it). A custom registry from `AddIndexThinkingReasoningModifiers(…)` is what the DI `UseIndexThinking()` uses (or pass `modifierRegistry:` to the `ThinkingChatClient` constructor); registering it does not turn reasoning on by itself |
 | Live `<think>` separation in streams | `ThinkingChatClientOptions.SeparateReasoningInStream` | Opt-in (default `false`) — see below |
-| Session context tracking + injection | `IContextTracker` (`InMemoryContextTracker`), `IContextInjector`; session id from `client.ChatAsync(sessionId, …)` / `SendAsync` or `ChatOptions` key `IndexThinking.SessionId` | Opt-in: `AddIndexThinkingContext(…)` (`ContextTrackerOptions.MaxTurns` 10, `SessionTtl` 1 h). `EnableContextTracking` / `EnableContextInjection` turn either half off |
+| Session context tracking + injection | `IContextTracker` (`InMemoryContextTracker`), `IContextInjector`; session id from `client.ChatAsync(sessionId, …)` / `SendAsync` or `ChatOptions` key `IndexThinking.SessionId` | Opt-in, and planned for removal (keep the history yourself; fit it with `ContextBudgetChatReducer`): `AddIndexThinkingContext(…)` (`ContextTrackerOptions.MaxTurns` 10, `SessionTtl` 1 h) **and** `ThinkingChatClientOptions.EnableContextTracking` / `EnableContextInjection = true` (both off by default). Past turns are injected as their user messages and response text — tool calls and results are left out |
 | Fit a request into a token budget | `ContextBudgetChatReducer` (`ContextBudgetOptions`: `MaxInputTokens` required, `ToolResults` = `ToolResultTrimmer` — 30 000 characters, first 50 and last 20 lines) — an M.E.AI `IChatReducer`: tool results over the limit keep their first and last lines; over the budget old tool results are masked (`Masking` — a `ToolResultMasker`; `Retention` lets the model read a masked one back by id; its `minimumClearTokens` masks only once enough has piled up past the boundary, so a prompt cache misses rarely), then the oldest messages leave, a tool round (call + results) always whole; system messages, the last user message and the newest round stay; a note marks each gap | Opt-in: `ChatClientBuilder.UseChatReducer(new ContextBudgetChatReducer(new() { MaxInputTokens = … }))`, registered after `UseFunctionInvocation()` so every round of a tool loop is fitted |
 | Token counting | `ITokenCounter` / `IChatMessageTokenCounter`: `ApproximateTokenCounter` (registered by `AddIndexThinkingAgents`), `TiktokenTokenCounter.ForModel(…)`, `TokenCounterFactory` | Default approximate counter — within a few percent of o200k_base on prose, Korean, code and JSON; a message counts its text, tool calls and results, reasoning and images (`ImageTokens` each). Other tokenizers differ (cl100k needs ~1.5x more for Korean); for a local model pass `ApproximateTokenCounter.ForModel(modelId)` — ratios fitted to Gemma's or Qwen's tokenizer (`LanguageRatios.Gemma` / `.Qwen`, which `TokenCounterFactory.Create(modelId)` also picks), where the defaults undercount JSON by a fifth to a quarter. The client also counts the request's tool definitions and, by default, scales its estimates by what the provider reports (`CalibrateTokenCounts`, `TokenEstimateFactor`). Register your own `ITokenCounter` before `AddIndexThinkingAgents()` to replace it |
 | Output-token boost and cap to the context window | `ThinkingChatClientOptions.ThinkingOutputMultiplier` (2, applied when reasoning is enabled), `MaxContextTokens` | Default on `GetResponseAsync` when the request sets `MaxOutputTokens` and a token counter is available (the cap); not applied to streams |
@@ -68,7 +68,6 @@ dotnet add package IndexThinking
 ```csharp
 // Register services
 services.AddIndexThinkingAgents();
-services.AddIndexThinkingContext();
 
 // Wrap any IChatClient
 var client = new ChatClientBuilder(innerClient)
@@ -85,8 +84,15 @@ var metrics = response.GetTurnMetrics();
 
 ### Session-Aware Chat
 
+The client is stateless by default: send the conversation you want the model to see. The session tracker is kept for one
+transition and will be removed — to keep using it, register it and turn both halves on:
+
 ```csharp
-// Context is tracked and injected per session (requires AddIndexThinkingContext)
+services.AddIndexThinkingContext();
+var client = new ChatClientBuilder(innerClient)
+    .UseIndexThinking(o => { o.EnableContextTracking = true; o.EnableContextInjection = true; })
+    .Build(serviceProvider);
+
 string answer = await client.ChatAsync("session-123", "Do that again");
 ```
 

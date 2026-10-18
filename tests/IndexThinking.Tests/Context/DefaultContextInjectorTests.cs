@@ -69,6 +69,64 @@ public class DefaultContextInjectorTests
     }
 
     [Fact]
+    public void InjectContext_TurnWhoseResponseIsOnlyAToolCall_InjectsNoCallWithoutItsResult()
+    {
+        // A function-invoking client outside the thinking client: the tracked response of a round is the call alone.
+        var messages = new List<ChatMessage> { new(ChatRole.User, "And the second file?") };
+        var context = new ConversationContext
+        {
+            SessionId = "session-1",
+            RecentTurns =
+            [
+                new ConversationTurn
+                {
+                    UserMessage = new ChatMessage(ChatRole.User, "Read the first file"),
+                    AssistantResponse = new ChatResponse(
+                    [
+                        new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "read_file", new Dictionary<string, object?> { ["path"] = "a.txt" })])
+                    ])
+                }
+            ]
+        };
+
+        var result = _injector.InjectContext(messages, context);
+
+        result.SelectMany(m => m.Contents).Should().NotContain(c => c is FunctionCallContent || c is FunctionResultContent);
+        result.Select(m => m.Text).Should().Equal("Read the first file", "And the second file?");
+    }
+
+    [Fact]
+    public void InjectContext_TurnWithAToolRound_InjectsItsTextOnly()
+    {
+        var messages = new List<ChatMessage> { new(ChatRole.User, "Summarize it again") };
+        var call = new ChatMessage(ChatRole.Assistant,
+        [
+            new TextContent("Let me read it."),
+            new FunctionCallContent("call-1", "read_file", new Dictionary<string, object?> { ["path"] = "a.txt" })
+        ]);
+        var turn = new ConversationTurn
+        {
+            UserMessage = new ChatMessage(ChatRole.User, "Summarize a.txt"),
+            AssistantResponse = new ChatResponse(
+            [
+                call,
+                new ChatMessage(ChatRole.Tool, [new FunctionResultContent("call-1", new string('x', 10_000))]),
+                new ChatMessage(ChatRole.Assistant, "It lists three invoices.")
+            ])
+        };
+        var context = new ConversationContext { SessionId = "session-1", RecentTurns = [turn] };
+
+        var result = _injector.InjectContext(messages, context);
+
+        result.Select(m => (m.Role, m.Text)).Should().Equal(
+            (ChatRole.User, "Summarize a.txt"),
+            (ChatRole.Assistant, "Let me read it."),
+            (ChatRole.Assistant, "It lists three invoices."),
+            (ChatRole.User, "Summarize it again"));
+        call.Contents.Should().HaveCount(2, "the tracked turn is copied, never changed");
+    }
+
+    [Fact]
     public void InjectContext_MultipleTurns_PreservesOrder()
     {
         // Arrange

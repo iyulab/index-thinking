@@ -14,7 +14,6 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // Configure IndexThinking services
 builder.Services.AddIndexThinkingAgents();
-builder.Services.AddIndexThinkingContext();
 builder.Services.AddIndexThinkingInMemoryStorage();
 builder.Services.AddIndexThinkingMetrics();
 
@@ -68,7 +67,7 @@ while (true)
     {
         var options = new ChatOptions();
         options.AdditionalProperties ??= [];
-        options.AdditionalProperties["SessionId"] = sessionId;
+        options.AdditionalProperties[ThinkingChatClientExtensions.SessionIdKey] = sessionId;
 
         var response = await chatClient.GetResponseAsync(messages, options);
 

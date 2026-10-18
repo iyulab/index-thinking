@@ -700,14 +700,14 @@ public class ThinkingChatClientContextIntegrationTests
 public class ThinkingChatClientOptionsContextTests
 {
     [Fact]
-    public void DefaultOptions_HasContextOptionsEnabled()
+    public void DefaultOptions_LeaveTheHistoryToTheCaller()
     {
         // Arrange & Act
         var options = new ThinkingChatClientOptions();
 
         // Assert
-        options.EnableContextTracking.Should().BeTrue();
-        options.EnableContextInjection.Should().BeTrue();
+        options.EnableContextTracking.Should().BeFalse();
+        options.EnableContextInjection.Should().BeFalse();
     }
 
     [Fact]

@@ -62,18 +62,18 @@ public class ThinkingChatClientOptions
     // ========================================
 
     /// <summary>
-    /// Whether to enable automatic conversation context tracking.
-    /// When enabled, conversations are tracked and context is injected automatically.
-    /// Default: true.
+    /// Whether to record each turn of a session in the registered <see cref="Abstractions.IContextTracker"/>.
+    /// Default: false — the caller owns the conversation history. Set it (with <see cref="EnableContextInjection"/>) to keep
+    /// using the session tracker registered by <c>AddIndexThinkingContext</c>; that tracker is planned for removal.
     /// </summary>
-    public bool EnableContextTracking { get; set; } = true;
+    public bool EnableContextTracking { get; set; }
 
     /// <summary>
-    /// Whether to enable context injection into messages.
-    /// When enabled, previous conversation turns are prepended to requests.
-    /// Default: true.
+    /// Whether to prepend the tracked turns of a session to each request (their user messages and response text; tool
+    /// calls and results are left out).
+    /// Default: false — the caller owns the conversation history.
     /// </summary>
-    public bool EnableContextInjection { get; set; } = true;
+    public bool EnableContextInjection { get; set; }
 
     // ========================================
     // Reasoning Activation Options (v0.12.0)

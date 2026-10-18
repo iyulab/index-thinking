@@ -26,7 +26,9 @@ token budgets and cost · detect a truncated response and continue it · keep pr
 `encrypted_content`) across a turn.
 
 It does not: split a task into several LLM calls · route work between agents · coordinate tool or function calls ·
-manage workflow state.
+manage workflow state · keep the conversation history — the caller sends it. The session tracker registered by
+`AddIndexThinkingContext` predates this scope; it is off unless `EnableContextTracking` and `EnableContextInjection` are set, and
+it is planned for removal.
 
 ```
 Agent orchestrator (any framework)
