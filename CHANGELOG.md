@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Added
+- **Token counts fitted to local models' tokenizers: `LanguageRatios.Gemma`, `LanguageRatios.Qwen`, `LanguageRatios.ForModel(modelId)`
+  and `ApproximateTokenCounter.ForModel(modelId)`.** The approximate counter is fitted to o200k_base; Gemma's and Qwen's
+  tokenizers split digits and punctuation finer, so with the default ratios a JSON tool result counted about a quarter (Gemma 4)
+  or a fifth (Qwen 3.5) too low — beyond the 15 % input margin of the output cap, on exactly the large results that fill a
+  small local window. With the family ratios the sums are within 5 % on English, Korean, mixed prose, C# and JSON, measured
+  against each model's own tokenizer. `ForModel` picks the family from the id (`gemma…`, `…qwen…`, e.g. `gguf:qwen3-fast`);
+  any other id keeps the o200k-fitted defaults.
+
+### Changed
+- **`TokenCounterFactory.Create(modelId)` uses the model's family ratios** for a Gemma or Qwen id (a factory constructed with
+  its own `LanguageRatios` keeps them). Counts for those models rise — most on JSON and code. A host that registers the
+  approximate counter itself (`AddIndexThinkingAgents()` registers the default) and serves a local model passes
+  `ApproximateTokenCounter.ForModel(modelId)` to `ThinkingChatClient` / `ToolResultMasker` / `ContextBudgetOptions.TokenCounter`.
+
 ## [0.30.0] - 2026-10-17
 
 ### Added

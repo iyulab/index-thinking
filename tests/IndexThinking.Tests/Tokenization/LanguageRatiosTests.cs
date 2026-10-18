@@ -6,6 +6,36 @@ namespace IndexThinking.Tests.Tokenization;
 
 public class LanguageRatiosTests
 {
+    [Theory]
+    [InlineData("gemma-4-E2B-it", "Gemma")]
+    [InlineData("gguf:gemma4-fast", "Gemma")]
+    [InlineData("gguf:qwen3-fast", "Qwen")]
+    [InlineData("Qwen3-8B-Instruct", "Qwen")]
+    [InlineData("gpt-4o", "Default")]
+    [InlineData("claude-sonnet-4", "Default")]
+    [InlineData(null, "Default")]
+    public void ForModel_PicksTheTokenizerFamily(string? modelId, string family)
+    {
+        var expected = family switch
+        {
+            "Gemma" => LanguageRatios.Gemma,
+            "Qwen" => LanguageRatios.Qwen,
+            _ => LanguageRatios.DefaultRatios,
+        };
+
+        LanguageRatios.ForModel(modelId).Should().BeSameAs(expected);
+    }
+
+    [Fact]
+    public void Local_family_presets_keep_the_unmeasured_scripts_at_the_defaults()
+    {
+        foreach (var preset in new[] { LanguageRatios.Gemma, LanguageRatios.Qwen })
+        {
+            preset.Japanese.Should().Be(LanguageRatios.DefaultRatios.Japanese);
+            preset.Chinese.Should().Be(LanguageRatios.DefaultRatios.Chinese);
+        }
+    }
+
     [Fact]
     public void DefaultRatios_ShouldHaveExpectedValues()
     {

@@ -34,7 +34,8 @@ public sealed class TokenCounterFactory
     /// <returns>A token counter configured for the model.</returns>
     /// <remarks>
     /// For OpenAI models, returns a chain with TiktokenTokenCounter first.
-    /// For other models, returns an ApproximateTokenCounter.
+    /// For other models, returns an ApproximateTokenCounter — with the ratios of the model's tokenizer family
+    /// (<see cref="LanguageRatios.ForModel"/>) unless this factory was given its own ratios.
     /// </remarks>
     public ITokenCounter Create(string? modelId = null)
     {
@@ -61,7 +62,7 @@ public sealed class TokenCounterFactory
         }
 
         // Always add approximate counter as final fallback
-        counters.Add(new ApproximateTokenCounter(_approximateRatios));
+        counters.Add(new ApproximateTokenCounter(RatiosFor(modelId)));
 
         var chain = new TokenCounterChain(counters);
         return modelId is not null ? chain.WithModel(modelId) : chain;
@@ -84,6 +85,10 @@ public sealed class TokenCounterFactory
     {
         return new ApproximateTokenCounter(_approximateRatios);
     }
+
+    // A factory built with the default ratios follows the model's family; one given its own ratios keeps them.
+    private LanguageRatios RatiosFor(string? modelId)
+        => ReferenceEquals(_approximateRatios, LanguageRatios.DefaultRatios) ? LanguageRatios.ForModel(modelId) : _approximateRatios;
 
     /// <summary>
     /// Gets or creates a shared default factory instance.

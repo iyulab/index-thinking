@@ -37,6 +37,12 @@ public sealed class ApproximateTokenCounter : IChatMessageTokenCounter
     }
 
     /// <summary>
+    /// An approximate counter with the ratios for <paramref name="modelId"/>'s tokenizer family (<see cref="LanguageRatios.ForModel"/>):
+    /// fitted to Gemma or Qwen for those local models, o200k_base otherwise.
+    /// </summary>
+    public static ApproximateTokenCounter ForModel(string? modelId) => new(LanguageRatios.ForModel(modelId));
+
+    /// <summary>
     /// Creates an approximate counter with custom language ratios.
     /// </summary>
     /// <param name="ratios">Custom character-to-token ratios.</param>

@@ -155,4 +155,37 @@ public class TokenCounterFactoryTests
         // Assert
         count.Should().BeGreaterThan(0);
     }
+
+    private const string JsonResult = "{\"items\":[{\"id\":1042,\"path\":\"src/a.cs\",\"size\":3381},{\"id\":1043,\"path\":\"src/b.cs\",\"size\":902}],\"total\":2}";
+
+    [Theory]
+    [InlineData("gemma-4-E4B-it")]
+    [InlineData("gguf:gemma4-fast")]
+    [InlineData("gguf:qwen3-fast")]
+    [InlineData("Qwen3-8B")]
+    public void Create_ForALocalModelFamily_CountsJsonHigherThanForACloudModel(string modelId)
+    {
+        // Gemma's and Qwen's tokenizers split digits and punctuation finer than o200k_base; their counter must not undercount
+        // a JSON tool result the way the o200k-fitted ratios do.
+        var local = _factory.Create(modelId).Count(JsonResult);
+        var cloud = _factory.Create("claude-sonnet-4").Count(JsonResult);
+
+        local.Should().BeGreaterThan(cloud);
+    }
+
+    [Fact]
+    public void Create_WithAnUnknownModel_KeepsTheO200kFittedRatios()
+    {
+        _factory.Create("claude-sonnet-4").Count(JsonResult)
+            .Should().Be(new ApproximateTokenCounter(LanguageRatios.DefaultRatios).Count(JsonResult));
+    }
+
+    [Fact]
+    public void A_factory_given_its_own_ratios_keeps_them_for_every_model()
+    {
+        var ratios = new LanguageRatios { Punctuation = 0.5 };
+        var factory = new TokenCounterFactory(ratios);
+
+        factory.Create("gguf:qwen3-fast").Count(JsonResult).Should().Be(new ApproximateTokenCounter(ratios).Count(JsonResult));
+    }
 }

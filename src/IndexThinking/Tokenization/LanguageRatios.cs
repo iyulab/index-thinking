@@ -62,6 +62,41 @@ public sealed record LanguageRatios
     public static LanguageRatios DefaultRatios { get; } = new();
 
     /// <summary>
+    /// Ratios fitted to Gemma's tokenizer (Gemma 4, measured through llama-server on English chat, Korean passages, mixed
+    /// Korean/English prose, C# and JSON). It splits digits and punctuation finer than o200k_base: with the default ratios a
+    /// JSON tool result is undercounted by about a quarter. Japanese and Chinese keep the defaults (not measured).
+    /// </summary>
+    public static LanguageRatios Gemma { get; } = new()
+    {
+        English = 6.23, Korean = 1.46, Digit = 0.93, Punctuation = 0.91, WhitespaceRun = 3.80, Default = 3.86,
+    };
+
+    /// <summary>
+    /// Ratios fitted to Qwen's tokenizer (Qwen 3.5, measured as for <see cref="Gemma"/>). With the default ratios a JSON tool
+    /// result is undercounted by about a fifth. Japanese and Chinese keep the defaults (not measured).
+    /// </summary>
+    public static LanguageRatios Qwen { get; } = new()
+    {
+        English = 6.84, Korean = 1.65, Digit = 0.93, Punctuation = 1.03, WhitespaceRun = 2.93, Default = 3.80,
+    };
+
+    /// <summary>
+    /// The ratios for <paramref name="modelId"/>: <see cref="Gemma"/> or <see cref="Qwen"/> when the id names that family
+    /// (<c>gemma-4-E4B-it</c>, <c>gguf:qwen3-fast</c>, <c>qwen3-8b</c> …), otherwise <see cref="DefaultRatios"/> (fitted to o200k_base,
+    /// which OpenAI's models use and other cloud models stay close to).
+    /// </summary>
+    public static LanguageRatios ForModel(string? modelId)
+    {
+        if (string.IsNullOrEmpty(modelId))
+            return DefaultRatios;
+        if (modelId.Contains("gemma", StringComparison.OrdinalIgnoreCase))
+            return Gemma;
+        if (modelId.Contains("qwen", StringComparison.OrdinalIgnoreCase))
+            return Qwen;
+        return DefaultRatios;
+    }
+
+    /// <summary>
     /// Gets the ratio for a detected language.
     /// </summary>
     /// <param name="language">The detected language.</param>
