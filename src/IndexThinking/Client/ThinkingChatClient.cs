@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
-using IndexThinking.Context;
 using IndexThinking.Core;
 using IndexThinking.Diagnostics;
 using IndexThinking.Modifiers;
@@ -22,7 +21,6 @@ namespace IndexThinking.Client;
 ///   <item>Task complexity estimation and budget management</item>
 ///   <item>Reasoning content extraction and parsing</item>
 ///   <item>Turn state management</item>
-///   <item>Conversation context tracking and injection (v0.9.0)</item>
 ///   <item>Explicit reasoning activation for providers that require it (v0.12.0)</item>
 /// </list>
 /// </remarks>
@@ -30,8 +28,6 @@ public class ThinkingChatClient : DelegatingChatClient
 {
     private readonly IThinkingTurnManager _turnManager;
     private readonly ThinkingChatClientOptions _options;
-    private readonly IContextTracker? _contextTracker;
-    private readonly IContextInjector? _contextInjector;
     private readonly IndexThinkingMeter? _meter;
     private readonly ReasoningRequestModifierRegistry? _modifierRegistry;
     private readonly ITokenCounter? _tokenCounter;
@@ -58,8 +54,6 @@ public class ThinkingChatClient : DelegatingChatClient
     /// <param name="innerClient">The inner client to delegate to.</param>
     /// <param name="turnManager">The turn manager for orchestrating thinking turns.</param>
     /// <param name="options">Configuration options.</param>
-    /// <param name="contextTracker">Optional context tracker for conversation management.</param>
-    /// <param name="contextInjector">Optional context injector for message enrichment.</param>
     /// <param name="meter">Optional meter for IndexThinking-specific metrics.</param>
     /// <param name="modifierRegistry">Optional registry for reasoning request modifiers.</param>
     /// <param name="tokenCounter">Optional token counter for auto-capping MaxOutputTokens.</param>
@@ -67,8 +61,6 @@ public class ThinkingChatClient : DelegatingChatClient
         IChatClient innerClient,
         IThinkingTurnManager turnManager,
         ThinkingChatClientOptions? options = null,
-        IContextTracker? contextTracker = null,
-        IContextInjector? contextInjector = null,
         IndexThinkingMeter? meter = null,
         ReasoningRequestModifierRegistry? modifierRegistry = null,
         ITokenCounter? tokenCounter = null)
@@ -76,8 +68,6 @@ public class ThinkingChatClient : DelegatingChatClient
     {
         _turnManager = turnManager ?? throw new ArgumentNullException(nameof(turnManager));
         _options = options ?? new ThinkingChatClientOptions();
-        _contextTracker = contextTracker;
-        _contextInjector = contextInjector;
         _meter = meter;
         _modifierRegistry = modifierRegistry ?? (_options.EnableReasoning ? ReasoningRequestModifierRegistry.Default : null);
         _tokenCounter = tokenCounter;
@@ -104,14 +94,11 @@ public class ThinkingChatClient : DelegatingChatClient
         // Enable reasoning in request if configured
         var modifiedOptions = EnableReasoningIfRequired(options);
 
-        // Inject conversation context if enabled
-        var enrichedMessages = InjectConversationContext(sessionId, messageList);
-
         // Validate input tokens fit within context window
-        ValidateInputTokens(enrichedMessages, modifiedOptions);
+        ValidateInputTokens(messageList, modifiedOptions);
 
         // Create thinking context from messages and options
-        var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
+        var context = CreateContext(messageList, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
         // Wrap sendRequest to auto-cap MaxOutputTokens and disable reasoning on continuation
         var isInitialRequest = true;
@@ -146,8 +133,6 @@ public class ThinkingChatClient : DelegatingChatClient
                 return response;
             });
 
-        // Track conversation if enabled
-        TrackConversation(sessionId, messageList, turnResult.Response);
 
         // Add IndexThinking-specific telemetry tags to current Activity
         AddTelemetryTags(turnResult);
@@ -187,11 +172,8 @@ public class ThinkingChatClient : DelegatingChatClient
         // Enable reasoning in request if configured (applies to streaming too)
         var modifiedOptions = EnableReasoningIfRequired(options);
 
-        // Inject conversation context if enabled
-        var enrichedMessages = InjectConversationContext(sessionId, messageList);
-
         // Validate input tokens fit within context window
-        ValidateInputTokens(enrichedMessages, modifiedOptions);
+        ValidateInputTokens(messageList, modifiedOptions);
 
         // Collect-and-Yield: buffer updates while streaming to caller. The collected updates are always the
         // ORIGINAL (raw) updates so post-stream orchestration (reasoning parsing, turn manager) is unchanged;
@@ -202,7 +184,7 @@ public class ThinkingChatClient : DelegatingChatClient
             ? new StreamingReasoningSeparator(_options.StreamingReasoningStartTag, _options.StreamingReasoningEndTag)
             : null;
 
-        await foreach (var update in base.GetStreamingResponseAsync(enrichedMessages, modifiedOptions, cancellationToken)
+        await foreach (var update in base.GetStreamingResponseAsync(messageList, modifiedOptions, cancellationToken)
             .ConfigureAwait(false))
         {
             collectedUpdates.Add(update);
@@ -221,9 +203,9 @@ public class ThinkingChatClient : DelegatingChatClient
         if (collectedUpdates.Count > 0)
         {
             var aggregatedResponse = collectedUpdates.ToChatResponse();
-            ObserveInputTokens(enrichedMessages, modifiedOptions, aggregatedResponse.Usage);
+            ObserveInputTokens(messageList, modifiedOptions, aggregatedResponse.Usage);
 
-            var context = CreateContext(enrichedMessages, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
+            var context = CreateContext(messageList, modifiedOptions, sessionId, _options.EnableReasoning, cancellationToken);
 
             // The caller already has every chunk, so a truncated stream is reported (TurnResult.IsTruncated), not
             // continued: there is no further request to send, and recovery would record text the caller never saw.
@@ -248,8 +230,6 @@ public class ThinkingChatClient : DelegatingChatClient
                     return Task.FromResult(aggregatedResponse);
                 });
 
-            // Track conversation if enabled
-            TrackConversation(sessionId, messageList, turnResult.Response);
 
             // Add telemetry tags
             AddTelemetryTags(turnResult);
@@ -426,25 +406,6 @@ public class ThinkingChatClient : DelegatingChatClient
     }
 
     /// <summary>
-    /// Injects conversation context into the messages.
-    /// </summary>
-    private IList<ChatMessage> InjectConversationContext(string sessionId, IList<ChatMessage> messages)
-    {
-        if (!_options.EnableContextInjection || _contextTracker is null || _contextInjector is null)
-        {
-            return messages;
-        }
-
-        var conversationContext = _contextTracker.GetContext(sessionId);
-        if (!conversationContext.HasHistory)
-        {
-            return messages;
-        }
-
-        return _contextInjector.InjectContext(messages, conversationContext);
-    }
-
-    /// <summary>
     /// Validates that input tokens do not exceed the configured context window.
     /// </summary>
     /// <exception cref="ContextWindowExceededException">When input tokens exceed the limit.</exception>
@@ -464,25 +425,6 @@ public class ThinkingChatClient : DelegatingChatClient
         if (safeInputTokens > maxContext.Value)
             throw new ContextWindowExceededException(inputTokens, maxContext.Value);
     }
-
-    /// <summary>
-    /// Tracks the conversation turn.
-    /// </summary>
-    private void TrackConversation(string sessionId, IList<ChatMessage> originalMessages, ChatResponse response)
-    {
-        if (!_options.EnableContextTracking || _contextTracker is null)
-        {
-            return;
-        }
-
-        // Track the last user message with the response
-        var lastUserMessage = originalMessages.LastOrDefault(m => m.Role == ChatRole.User);
-        if (lastUserMessage is not null)
-        {
-            _contextTracker.Track(sessionId, lastUserMessage, response);
-        }
-    }
-
 
     /// <summary>
     /// Adds IndexThinking-specific telemetry tags to the current Activity.

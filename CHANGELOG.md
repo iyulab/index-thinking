@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file. Versions follow
 [Semantic Versioning](https://semver.org/); while the major version is 0, a minor release may contain
 breaking changes, and each one is marked **Breaking** with a migration note.
 
+## [Unreleased]
+
+### Removed
+- **Breaking: the session tracker and injector are gone — the conversation history is the caller's.** `IContextTracker`,
+  `InMemoryContextTracker`, `IContextInjector`, `DefaultContextInjector`, `ContextTrackerOptions`, `ContextInjectorOptions`,
+  `ConversationTurn`, `ConversationContext`, `AddIndexThinkingContext(…)`, `ThinkingChatClientOptions.EnableContextTracking` /
+  `EnableContextInjection`, the tracker/injector parameters of the `ThinkingChatClient` constructor and of
+  `UseIndexThinking(turnManager, …)`, and the `ChatAsync(sessionId, message)` / `SendAsync(sessionId, message)` helpers are
+  removed. A session id (`WithSession`, `IndexThinking.SessionId`) still keys the thinking state store and the metrics.
+  Migration: send the history you want the model to see (fit it with `ContextBudgetChatReducer`); delete
+  `AddIndexThinkingContext()` and any `EnableContextTracking` / `EnableContextInjection` assignment; replace
+  `client.ChatAsync(id, text)` with `client.GetResponseAsync(history, ThinkingChatClientExtensions.WithSession(id))`; pass the
+  meter, modifier registry and token counter to the constructor by name.
+
 ## [0.32.0] - 2026-10-19
 
 ### Changed

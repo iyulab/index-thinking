@@ -37,7 +37,6 @@ public class SimulationTestFixture : IDisposable
         // Build service provider
         var services = new ServiceCollection();
         services.AddIndexThinkingAgents();
-        services.AddIndexThinkingContext();
         services.AddIndexThinkingInMemoryStorage();
         services.AddIndexThinkingMetrics();
 

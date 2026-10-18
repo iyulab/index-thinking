@@ -19,15 +19,11 @@ public static class ThinkingChatClientExtensions
     /// <param name="builder">The chat client builder.</param>
     /// <param name="turnManager">The turn manager for orchestrating thinking turns.</param>
     /// <param name="configure">Optional action to configure options.</param>
-    /// <param name="contextTracker">Optional context tracker for conversation management.</param>
-    /// <param name="contextInjector">Optional context injector for message enrichment.</param>
     /// <returns>The builder for chaining.</returns>
     public static ChatClientBuilder UseIndexThinking(
         this ChatClientBuilder builder,
         IThinkingTurnManager turnManager,
-        Action<ThinkingChatClientOptions>? configure = null,
-        IContextTracker? contextTracker = null,
-        IContextInjector? contextInjector = null)
+        Action<ThinkingChatClientOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(turnManager);
@@ -36,7 +32,7 @@ public static class ThinkingChatClientExtensions
         {
             var options = new ThinkingChatClientOptions();
             configure?.Invoke(options);
-            return new ThinkingChatClient(innerClient, turnManager, options, contextTracker, contextInjector);
+            return new ThinkingChatClient(innerClient, turnManager, options);
         });
     }
 
@@ -51,15 +47,9 @@ public static class ThinkingChatClientExtensions
     /// This overload resolves services from the DI container:
     /// </para>
     /// <list type="bullet">
-    ///   <item><see cref="IThinkingTurnManager"/> (required)</item>
-    ///   <item><see cref="IContextTracker"/> (optional, for conversation tracking)</item>
-    ///   <item><see cref="IContextInjector"/> (optional, for context injection)</item>
+    ///   <item><see cref="IThinkingTurnManager"/> (required — <c>AddIndexThinkingAgents()</c>)</item>
+    ///   <item><see cref="ITokenCounter"/>, <see cref="IndexThinkingMeter"/>, <see cref="ReasoningRequestModifierRegistry"/> (optional)</item>
     /// </list>
-    /// <para>
-    /// Ensure that the required services are registered using:
-    /// AddIndexThinkingAgents() for turn management and
-    /// AddIndexThinkingContext() for context tracking.
-    /// </para>
     /// </remarks>
     public static ChatClientBuilder UseIndexThinking(
         this ChatClientBuilder builder,
@@ -70,8 +60,6 @@ public static class ThinkingChatClientExtensions
         return builder.Use((innerClient, services) =>
         {
             var turnManager = services.GetRequiredService<IThinkingTurnManager>();
-            var contextTracker = services.GetService<IContextTracker>();
-            var contextInjector = services.GetService<IContextInjector>();
             var tokenCounter = services.GetService<ITokenCounter>();
             // What AddIndexThinkingMetrics() and AddIndexThinkingReasoningModifiers(…) registered. A registry does not
             // turn reasoning on by itself — ThinkingChatClientOptions.EnableReasoning still decides.
@@ -81,7 +69,7 @@ public static class ThinkingChatClientExtensions
             var options = new ThinkingChatClientOptions();
             configure?.Invoke(options);
 
-            return new ThinkingChatClient(innerClient, turnManager, options, contextTracker, contextInjector,
+            return new ThinkingChatClient(innerClient, turnManager, options,
                 meter, modifierRegistry, tokenCounter);
         });
     }
@@ -138,75 +126,14 @@ public static class ThinkingChatClientExtensions
     }
 
     // ========================================
-    // Convenience Extension Methods (v0.9.0)
+    // Session id (keys the thinking state store and metrics)
     // ========================================
 
     /// <summary>
-    /// Session ID key used in ChatOptions.AdditionalProperties.
+    /// Session ID key used in ChatOptions.AdditionalProperties. The session id keys the thinking state
+    /// (<see cref="IThinkingStateStore"/>) and the per-session metrics; the conversation history stays the caller's.
     /// </summary>
     public const string SessionIdKey = "IndexThinking.SessionId";
-
-    /// <summary>
-    /// Sends a simple message with session tracking.
-    /// </summary>
-    /// <param name="client">The chat client.</param>
-    /// <param name="sessionId">Session identifier for conversation tracking.</param>
-    /// <param name="message">The user message.</param>
-    /// <param name="options">Optional chat options.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The assistant's response text.</returns>
-    /// <remarks>
-    /// This is a convenience method for simple chat scenarios.
-    /// For more control, use <see cref="IChatClient.GetResponseAsync"/> directly.
-    /// </remarks>
-    public static async Task<string> ChatAsync(
-        this IChatClient client,
-        string sessionId,
-        string message,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(client);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-
-        options = WithSessionId(options, sessionId);
-
-        var response = await client.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, message)],
-            options,
-            cancellationToken);
-
-        return response.Messages?.FirstOrDefault()?.Text ?? string.Empty;
-    }
-
-    /// <summary>
-    /// Sends a message with session tracking and returns the full response.
-    /// </summary>
-    /// <param name="client">The chat client.</param>
-    /// <param name="sessionId">Session identifier for conversation tracking.</param>
-    /// <param name="message">The user message.</param>
-    /// <param name="options">Optional chat options.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The full chat response.</returns>
-    public static Task<ChatResponse> SendAsync(
-        this IChatClient client,
-        string sessionId,
-        string message,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(client);
-        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
-        ArgumentException.ThrowIfNullOrWhiteSpace(message);
-
-        options = WithSessionId(options, sessionId);
-
-        return client.GetResponseAsync(
-            [new ChatMessage(ChatRole.User, message)],
-            options,
-            cancellationToken);
-    }
 
     /// <summary>
     /// Creates chat options with the specified session ID.

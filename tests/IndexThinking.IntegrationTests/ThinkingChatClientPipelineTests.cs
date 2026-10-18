@@ -94,54 +94,6 @@ public class ThinkingChatClientPipelineTests
     }
 
     [Fact]
-    public async Task FullPipeline_WithSessionId_PreservesSession()
-    {
-        // Arrange
-        var innerClient = new MockChatClient()
-            .WithResponse("First response")
-            .WithResponse("Second response");
-
-        var services = new ServiceCollection()
-            .AddIndexThinkingAgents()
-            .AddIndexThinkingInMemoryStorage()
-            .AddIndexThinkingContext()
-            .BuildServiceProvider();
-
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = true,
-            EnableContextInjection = true
-        };
-
-        var contextTracker = services.GetRequiredService<IContextTracker>();
-        var contextInjector = services.GetRequiredService<IContextInjector>();
-        var turnManager = services.GetRequiredService<IThinkingTurnManager>();
-
-        var client = new ThinkingChatClient(
-            innerClient,
-            turnManager,
-            options,
-            contextTracker,
-            contextInjector);
-
-        var sessionOptions = ThinkingChatClientExtensions.WithSession("test-session-123");
-
-        // Act - First request
-        var response1 = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hello")], sessionOptions, TestContext.Current.CancellationToken);
-
-        // Act - Second request
-        var response2 = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "How are you?")], sessionOptions, TestContext.Current.CancellationToken);
-
-        // Assert
-        response1.Should().NotBeNull();
-        response2.Should().NotBeNull();
-
-        // Verify context was tracked
-        var context = contextTracker.GetContext("test-session-123");
-        context.RecentTurns.Should().HaveCount(2);
-    }
-
-    [Fact]
     public async Task FullPipeline_ComplexRequest_EstimatesComplexity()
     {
         // Arrange

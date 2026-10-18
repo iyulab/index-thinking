@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Client;
-using IndexThinking.Context;
 using IndexThinking.Core;
 using Microsoft.Extensions.AI;
 using IndexThinking.Continuation;
@@ -61,6 +60,30 @@ public class ThinkingChatClientTests : IDisposable
         seen[0]!.Tools.Should().ContainSingle("the turn's own request keeps the tools");
         seen[1]!.Tools.Should().BeNull("a continuation finishes the answer; it does not act again");
         seen[1]!.ToolMode.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ASession_SendsExactlyTheCallersMessages_TurnAfterTurn()
+    {
+        // The conversation history is the caller's: a session id keys the thinking state, it never adds earlier turns
+        // (an added assistant tool call without its result is what providers reject).
+        var sent = new List<IList<ChatMessage>>();
+        _turnManager
+            .ProcessTurnAsync(Arg.Any<ThinkingContext>(), Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
+            .Returns(call =>
+            {
+                sent.Add(call.ArgAt<ThinkingContext>(0).Messages.ToList());
+                var response = new ChatResponse([
+                    new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("c1", "lookup")])]);
+                return Task.FromResult(TurnResult.Success(response, TurnMetrics.CreateBuilder().Build()));
+            });
+        var session = ThinkingChatClientExtensions.WithSession("s-1");
+
+        await _client.GetResponseAsync([new ChatMessage(ChatRole.User, "first")], session, TestContext.Current.CancellationToken);
+        await _client.GetResponseAsync([new ChatMessage(ChatRole.User, "second")], session, TestContext.Current.CancellationToken);
+
+        sent.Should().HaveCount(2);
+        sent[1].Should().ContainSingle().Which.Text.Should().Be("second");
     }
 
     [Fact]
@@ -511,220 +534,8 @@ public class ThinkingChatClientExtensionsTests
     }
 }
 
-public class ThinkingChatClientContextIntegrationTests
-{
-    private readonly IChatClient _innerClient;
-    private readonly IThinkingTurnManager _turnManager;
-    private readonly IContextTracker _contextTracker;
-    private readonly IContextInjector _contextInjector;
-
-    public ThinkingChatClientContextIntegrationTests()
-    {
-        _innerClient = Substitute.For<IChatClient>();
-        _turnManager = Substitute.For<IThinkingTurnManager>();
-        _contextTracker = Substitute.For<IContextTracker>();
-        _contextInjector = Substitute.For<IContextInjector>();
-    }
-
-    [Fact]
-    public async Task GetResponseAsync_WithContext_InjectsHistory()
-    {
-        // Arrange
-        var messages = new List<ChatMessage> { new(ChatRole.User, "Current message") };
-        var previousTurn = new ConversationTurn
-        {
-            UserMessage = new ChatMessage(ChatRole.User, "Previous"),
-            AssistantResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Response")])
-        };
-        var context = new ConversationContext
-        {
-            SessionId = "test-session",
-            RecentTurns = [previousTurn]
-        };
-
-        _contextTracker
-            .GetContext("test-session")
-            .Returns(context);
-
-        var enrichedMessages = new List<ChatMessage>
-        {
-            new(ChatRole.User, "Previous"),
-            new(ChatRole.Assistant, "Response"),
-            new(ChatRole.User, "Current message")
-        };
-
-        _contextInjector
-            .InjectContext(Arg.Any<IList<ChatMessage>>(), context)
-            .Returns(enrichedMessages);
-
-        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Reply")]);
-        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
-        IList<ChatMessage>? capturedMessages = null;
-
-        _turnManager
-            .ProcessTurnAsync(
-                Arg.Any<ThinkingContext>(),
-                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
-            .Returns(callInfo =>
-            {
-                capturedMessages = callInfo.ArgAt<ThinkingContext>(0).Messages;
-                return Task.FromResult(turnResult);
-            });
-
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = true,
-            EnableContextInjection = true
-        };
-
-        var client = new ThinkingChatClient(
-            _innerClient,
-            _turnManager,
-            options,
-            _contextTracker,
-            _contextInjector);
-
-        var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
-
-        // Act
-        await client.GetResponseAsync(messages, chatOptions, TestContext.Current.CancellationToken);
-
-        // Assert
-        capturedMessages.Should().HaveCount(3);
-        _contextInjector.Received(1).InjectContext(Arg.Any<IList<ChatMessage>>(), context);
-    }
-
-    [Fact]
-    public async Task GetResponseAsync_TracksConversation()
-    {
-        // Arrange
-        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
-        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
-        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
-
-        _contextTracker
-            .GetContext(Arg.Any<string>())
-            .Returns(ConversationContext.Empty("test-session"));
-
-        _turnManager
-            .ProcessTurnAsync(
-                Arg.Any<ThinkingContext>(),
-                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
-            .Returns(Task.FromResult(turnResult));
-
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = true,
-            EnableContextInjection = true
-        };
-
-        var client = new ThinkingChatClient(
-            _innerClient,
-            _turnManager,
-            options,
-            _contextTracker,
-            _contextInjector);
-
-        var chatOptions = ThinkingChatClientExtensions.WithSession("test-session");
-
-        // Act
-        await client.GetResponseAsync(messages, chatOptions, TestContext.Current.CancellationToken);
-
-        // Assert
-        _contextTracker.Received(1)
-            .Track("test-session", Arg.Is<ChatMessage>(m => m.Text == "Hello"), expectedResponse);
-    }
-
-    [Fact]
-    public async Task GetResponseAsync_DisabledContextTracking_DoesNotTrack()
-    {
-        // Arrange
-        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
-        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
-        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
-
-        _turnManager
-            .ProcessTurnAsync(
-                Arg.Any<ThinkingContext>(),
-                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
-            .Returns(Task.FromResult(turnResult));
-
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = false,
-            EnableContextInjection = false
-        };
-
-        var client = new ThinkingChatClient(
-            _innerClient,
-            _turnManager,
-            options,
-            _contextTracker,
-            _contextInjector);
-
-        // Act
-        await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
-
-        // Assert
-        _contextTracker.DidNotReceive().Track(Arg.Any<string>(), Arg.Any<ChatMessage>(), Arg.Any<ChatResponse>());
-        _contextInjector.DidNotReceive().InjectContext(Arg.Any<IList<ChatMessage>>(), Arg.Any<ConversationContext>());
-    }
-
-    [Fact]
-    public async Task GetResponseAsync_WithoutContextServices_WorksNormally()
-    {
-        // Arrange
-        var messages = new List<ChatMessage> { new(ChatRole.User, "Hello") };
-        var expectedResponse = new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]);
-        var turnResult = TurnResult.Success(expectedResponse, TurnMetrics.CreateBuilder().Build());
-
-        _turnManager
-            .ProcessTurnAsync(
-                Arg.Any<ThinkingContext>(),
-                Arg.Any<Func<IList<ChatMessage>, CancellationToken, Task<ChatResponse>>>())
-            .Returns(Task.FromResult(turnResult));
-
-        // No context tracker or injector
-        var client = new ThinkingChatClient(
-            _innerClient,
-            _turnManager);
-
-        // Act
-        var response = await client.GetResponseAsync(messages, cancellationToken: TestContext.Current.CancellationToken);
-
-        // Assert
-        response.Should().NotBeNull();
-    }
-}
-
 public class ThinkingChatClientOptionsContextTests
 {
-    [Fact]
-    public void DefaultOptions_LeaveTheHistoryToTheCaller()
-    {
-        // Arrange & Act
-        var options = new ThinkingChatClientOptions();
-
-        // Assert
-        options.EnableContextTracking.Should().BeFalse();
-        options.EnableContextInjection.Should().BeFalse();
-    }
-
-    [Fact]
-    public void ContextOptions_CanBeCustomized()
-    {
-        // Arrange & Act
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = false,
-            EnableContextInjection = false,
-        };
-
-        // Assert
-        options.EnableContextTracking.Should().BeFalse();
-        options.EnableContextInjection.Should().BeFalse();
-    }
-
     [Fact]
     public void MaxContextTokens_PropagatesToContinuation()
     {
@@ -768,8 +579,7 @@ public class ThinkingChatClientInputValidationTests : IDisposable
         _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(5000);
         var options = new ThinkingChatClientOptions
         {
-            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 },
-            EnableContextInjection = false
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 }
         };
         var client = new ThinkingChatClient(
             _innerClient, _turnManager, options, tokenCounter: _tokenCounter);
@@ -794,8 +604,7 @@ public class ThinkingChatClientInputValidationTests : IDisposable
         _tokenCounter.Count(Arg.Any<ChatMessage>()).Returns(100);
         var options = new ThinkingChatClientOptions
         {
-            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 },
-            EnableContextInjection = false
+            DefaultContinuation = new ContinuationConfig { MaxContextTokens = 8000 }
         };
         var turnResult = TurnResult.Success(
             new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
@@ -821,7 +630,6 @@ public class ThinkingChatClientInputValidationTests : IDisposable
         var options = new ThinkingChatClientOptions
         {
             DefaultContinuation = new ContinuationConfig { MaxContextTokens = 1 },
-            EnableContextInjection = false
         };
         var turnResult = TurnResult.Success(
             new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),
@@ -848,7 +656,6 @@ public class ThinkingChatClientInputValidationTests : IDisposable
         var options = new ThinkingChatClientOptions
         {
             DefaultContinuation = new ContinuationConfig { MaxContextTokens = null },
-            EnableContextInjection = false
         };
         var turnResult = TurnResult.Success(
             new ChatResponse([new ChatMessage(ChatRole.Assistant, "Hi")]),

@@ -39,8 +39,6 @@ public class InputEstimateTests
         var options = new ThinkingChatClientOptions
         {
             DefaultContinuation = new ContinuationConfig { MaxContextTokens = Window },
-            EnableContextInjection = false,
-            EnableContextTracking = false,
             CalibrateTokenCounts = calibrate,
         };
         return (new ThinkingChatClient(inner, turns, options, tokenCounter: new ApproximateTokenCounter()), seen, inner);

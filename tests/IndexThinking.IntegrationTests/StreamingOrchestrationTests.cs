@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Client;
-using IndexThinking.Context;
 using IndexThinking.Extensions;
 using IndexThinking.IntegrationTests.Fixtures;
 using Microsoft.Extensions.AI;
@@ -131,50 +130,6 @@ public class StreamingOrchestrationTests
 
         var metrics = lastUpdate.AdditionalProperties![ThinkingChatClient.TurnMetricsKey] as TurnMetrics;
         metrics.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task Streaming_WithSessionTracking_TracksConversation()
-    {
-        // Arrange
-        var innerClient = new MockChatClient()
-            .WithResponse("First streaming response")
-            .WithResponse("Second streaming response");
-
-        var services = new ServiceCollection()
-            .AddIndexThinkingAgents()
-            .AddIndexThinkingInMemoryStorage()
-            .AddIndexThinkingContext()
-            .BuildServiceProvider();
-
-        var contextTracker = services.GetRequiredService<IContextTracker>();
-        var contextInjector = services.GetRequiredService<IContextInjector>();
-        var turnManager = services.GetRequiredService<IThinkingTurnManager>();
-
-        var options = new ThinkingChatClientOptions
-        {
-            EnableContextTracking = true,
-            EnableContextInjection = true
-        };
-
-        var client = new ThinkingChatClient(
-            innerClient,
-            turnManager,
-            options,
-            contextTracker,
-            contextInjector);
-
-        var sessionOptions = ThinkingChatClientExtensions.WithSession("streaming-session-1");
-
-        // Act - First streaming request
-        await foreach (var _ in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Hello via stream")], sessionOptions, TestContext.Current.CancellationToken)) { }
-
-        // Act - Second streaming request
-        await foreach (var _ in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Second message")], sessionOptions, TestContext.Current.CancellationToken)) { }
-
-        // Assert - Context should track both turns
-        var context = contextTracker.GetContext("streaming-session-1");
-        context.RecentTurns.Should().HaveCount(2);
     }
 
     [Fact]

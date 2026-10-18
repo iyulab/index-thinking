@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using IndexThinking.Abstractions;
 using IndexThinking.Agents;
 using IndexThinking.Client;
-using IndexThinking.Context;
 using IndexThinking.Diagnostics;
 using IndexThinking.Extensions;
 using IndexThinking.IntegrationTests.Fixtures;
@@ -73,47 +72,6 @@ public class DiContainerIntegrationTests
         // Assert
         store.Should().NotBeNull();
         store.Should().BeOfType<InMemoryThinkingStateStore>();
-    }
-
-    [Fact]
-    public void AddIndexThinkingContext_RegistersContextServices()
-    {
-        // Arrange
-        var services = new ServiceCollection()
-            .AddIndexThinkingContext();
-
-        // Act
-        var provider = services.BuildServiceProvider();
-
-        // Assert
-        provider.GetService<IContextTracker>().Should().NotBeNull();
-        provider.GetService<IContextInjector>().Should().NotBeNull();
-    }
-
-    [Fact]
-    public void AddIndexThinkingContext_WithOptions_AppliesConfiguration()
-    {
-        // Arrange
-        var services = new ServiceCollection()
-            .AddIndexThinkingContext(
-                new ContextTrackerOptions
-                {
-                    MaxTurns = 20,
-                    SessionTtl = TimeSpan.FromHours(2)
-                },
-                new ContextInjectorOptions
-                {
-                    MaxTurnsToInject = 10
-                });
-
-        // Act
-        var provider = services.BuildServiceProvider();
-        var tracker = provider.GetService<IContextTracker>();
-        var injector = provider.GetService<IContextInjector>();
-
-        // Assert
-        tracker.Should().NotBeNull();
-        injector.Should().NotBeNull();
     }
 
     [Fact]
@@ -192,7 +150,6 @@ public class DiContainerIntegrationTests
         var services = new ServiceCollection()
             .AddIndexThinkingAgents()
             .AddIndexThinkingInMemoryStorage()
-            .AddIndexThinkingContext()
             .AddIndexThinkingMetrics();
 
         // Act
@@ -203,8 +160,6 @@ public class DiContainerIntegrationTests
         provider.GetService<IContinuationHandler>().Should().NotBeNull();
         provider.GetService<IThinkingTurnManager>().Should().NotBeNull();
         provider.GetService<IThinkingStateStore>().Should().NotBeNull();
-        provider.GetService<IContextTracker>().Should().NotBeNull();
-        provider.GetService<IContextInjector>().Should().NotBeNull();
         provider.GetService<IndexThinkingMeter>().Should().NotBeNull();
     }
 

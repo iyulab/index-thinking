@@ -1,6 +1,5 @@
 using IndexThinking.Agents;
 using IndexThinking.Continuation;
-using IndexThinking.Context;
 using IndexThinking.Core;
 using IndexThinking.Modifiers;
 
@@ -41,8 +40,7 @@ public class ThinkingChatClientOptions
 
     /// <summary>
     /// Maximum context tokens for the model. Setting it sets <see cref="ContinuationConfig.MaxContextTokens"/> on
-    /// <see cref="DefaultContinuation"/>. The context injector takes its own <see cref="ContextInjectorOptions"/> where it
-    /// is constructed (<c>AddIndexThinkingContext</c>). Default: null (the continuation's own setting).
+    /// <see cref="DefaultContinuation"/>. Default: null (the continuation's own setting).
     /// </summary>
     public int? MaxContextTokens
     {
@@ -56,24 +54,6 @@ public class ThinkingChatClientOptions
             }
         }
     }
-
-    // ========================================
-    // Context-Aware Chat Options (v0.9.0)
-    // ========================================
-
-    /// <summary>
-    /// Whether to record each turn of a session in the registered <see cref="Abstractions.IContextTracker"/>.
-    /// Default: false — the caller owns the conversation history. Set it (with <see cref="EnableContextInjection"/>) to keep
-    /// using the session tracker registered by <c>AddIndexThinkingContext</c>; that tracker is planned for removal.
-    /// </summary>
-    public bool EnableContextTracking { get; set; }
-
-    /// <summary>
-    /// Whether to prepend the tracked turns of a session to each request (their user messages and response text; tool
-    /// calls and results are left out).
-    /// Default: false — the caller owns the conversation history.
-    /// </summary>
-    public bool EnableContextInjection { get; set; }
 
     // ========================================
     // Reasoning Activation Options (v0.12.0)
