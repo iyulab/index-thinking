@@ -8,6 +8,7 @@ on:
       - '**/*.targets'
       - 'src/**'
       - 'tests/**'
+      - 'samples/**'
       - '*.slnx'
       - '.github/workflows/ci.yml'
   pull_request:
