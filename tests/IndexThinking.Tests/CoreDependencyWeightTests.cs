@@ -6,9 +6,9 @@ using Xunit;
 namespace IndexThinking.Tests;
 
 /// <summary>
-/// <c>IndexThinking</c> carries no SQLite: the persistent store lives in <c>IndexThinking.Sqlite</c> (0.23.0). Before
-/// the split every consumer shipped <c>Microsoft.Data.Sqlite</c> and the native <c>e_sqlite3</c> for every RID, for a
-/// store most hosts never register. Two facts, because each alone misses a way back in: a package reference nothing
+/// <c>IndexThinking</c> carries no SQLite. Before 0.23.0 every consumer shipped <c>Microsoft.Data.Sqlite</c> and the native
+/// <c>e_sqlite3</c> for every RID, for a store most hosts never register; the store went to a satellite package, which is no
+/// longer published. Two facts, because each alone misses a way back in: a package reference nothing
 /// uses still ships as a nuspec dependency, and an assembly can arrive without a package reference of its own.
 /// </summary>
 public class CoreDependencyWeightTests
@@ -27,7 +27,7 @@ public class CoreDependencyWeightTests
             .ToList();
 
         references.Should().NotBeEmpty("the scan must read the real project file");
-        references.Where(IsSqlite).Should().BeEmpty("SQLite ships with IndexThinking.Sqlite, not with every consumer");
+        references.Where(IsSqlite).Should().BeEmpty("a consumer would ship SQLite native binaries for every RID");
     }
 
     [Fact]
@@ -39,15 +39,6 @@ public class CoreDependencyWeightTests
 
         referenced.Should().Contain("Microsoft.Extensions.AI.Abstractions", "positive control: the scan sees real references");
         referenced.Where(IsSqlite).Should().BeEmpty();
-    }
-
-    [Fact]
-    public void Satellite_assembly_references_sqlite()
-    {
-        // Positive control for the name filter: the store's own assembly is where SQLite belongs.
-        typeof(SqliteThinkingStateStore).Assembly.GetReferencedAssemblies()
-            .Select(a => a.Name ?? string.Empty)
-            .Should().Contain(name => IsSqlite(name));
     }
 
     private static string RepositoryRoot()

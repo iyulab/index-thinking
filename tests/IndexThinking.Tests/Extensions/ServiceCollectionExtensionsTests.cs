@@ -119,124 +119,6 @@ public class ServiceCollectionExtensionsTests
 
     #endregion
 
-    #region SQLite Storage
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_WithConnectionString_RegistersServices()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act
-        services.AddIndexThinkingSqliteStorage("Data Source=:memory:");
-
-        // Assert
-        var provider = services.BuildServiceProvider();
-        var store = provider.GetService<IThinkingStateStore>();
-
-        store.Should().NotBeNull();
-        store.Should().BeOfType<SqliteThinkingStateStore>();
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_WithOptions_RegistersServices()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        var options = new SqliteStateStoreOptions
-        {
-            ConnectionString = "Data Source=:memory:",
-            EnableWalMode = false
-        };
-
-        // Act
-        services.AddIndexThinkingSqliteStorage(options);
-
-        // Assert
-        var provider = services.BuildServiceProvider();
-        var store = provider.GetService<IThinkingStateStore>();
-        var registeredOptions = provider.GetService<SqliteStateStoreOptions>();
-
-        store.Should().NotBeNull();
-        registeredOptions.Should().NotBeNull();
-        registeredOptions!.EnableWalMode.Should().BeFalse();
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_WithConfigure_RegistersServices()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act
-        services.AddIndexThinkingSqliteStorage(options =>
-        {
-            options.ConnectionString = "Data Source=:memory:";
-        });
-
-        // Assert
-        var provider = services.BuildServiceProvider();
-        var store = provider.GetService<IThinkingStateStore>();
-
-        store.Should().NotBeNull();
-        store.Should().BeOfType<SqliteThinkingStateStore>();
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_WithConfigure_EmptyConnectionString_Throws()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act - should throw because connection string is not set
-        var action = () => services.AddIndexThinkingSqliteStorage(o => { });
-
-        // Assert
-        action.Should().Throw<InvalidOperationException>()
-            .WithMessage("*ConnectionString*");
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_IsSingleton()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddIndexThinkingSqliteStorage("Data Source=:memory:");
-
-        // Act
-        var provider = services.BuildServiceProvider();
-        var store1 = provider.GetService<IThinkingStateStore>();
-        var store2 = provider.GetService<IThinkingStateStore>();
-
-        // Assert
-        store1.Should().BeSameAs(store2);
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_NullServices_Throws()
-    {
-        // Act
-        var action = () => ((IServiceCollection)null!).AddIndexThinkingSqliteStorage("Data Source=:memory:");
-
-        // Assert
-        action.Should().Throw<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void AddIndexThinkingSqliteStorage_NullOptions_Throws()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act
-        var action = () => services.AddIndexThinkingSqliteStorage((SqliteStateStoreOptions)null!);
-
-        // Assert
-        action.Should().Throw<ArgumentNullException>();
-    }
-
-    #endregion
-
     #region Agent Services
 
     [Fact]
@@ -323,9 +205,10 @@ public class ServiceCollectionExtensionsTests
         // Arrange
         var services = new ServiceCollection();
 
-        // Act - register InMemory first, then SQLite
+        // Act - register InMemory first, then the distributed-cache store
+        services.AddDistributedMemoryCache();
         services.AddIndexThinkingInMemoryStorage();
-        services.AddIndexThinkingSqliteStorage("Data Source=:memory:");
+        services.AddIndexThinkingDistributedStorage();
 
         // Assert - first registration wins due to TryAdd
         var provider = services.BuildServiceProvider();

@@ -13,7 +13,7 @@ IndexThinking handles the repetitive-but-hard parts of LLM integration:
 - **Reasoning Extraction** - Unified API for provider-specific thinking formats
 - **Token Management** - Token usage tracking (`IBudgetTracker`) and complexity estimation (`IComplexityEstimator`), reported in turn metrics — informational, not limits. To cap how much a model thinks, set it on the request: `ChatOptions.Reasoning` (effort) and `ChatOptions.MaxOutputTokens`; IndexThinking extracts the reasoning, it does not throttle it
 - **Content Recovery** - Repair truncated JSON/code blocks
-- **Thinking State Stores** - `IThinkingStateStore` implementations: in-memory (`AddIndexThinkingInMemoryStorage`) and distributed-cache (`AddIndexThinkingDistributedStorage`) in the core package, persistent SQLite in `IndexThinking.Sqlite`. All are opt-in — `AddIndexThinkingAgents` registers no store, and without one no per-session state is saved
+- **Thinking State Stores** - `IThinkingStateStore` implementations: in-memory (`AddIndexThinkingInMemoryStorage`) and distributed-cache (`AddIndexThinkingDistributedStorage`) in the core package (or your own implementation for a persistent store). All are opt-in — `AddIndexThinkingAgents` registers no store, and without one no per-session state is saved
 
 ## Features
 
@@ -32,7 +32,7 @@ Each row: what it does · entry point · how to turn it on. "Default" means the 
 | Token counting | `ITokenCounter` / `IChatMessageTokenCounter`: `ApproximateTokenCounter` (registered by `AddIndexThinkingAgents`), `TiktokenTokenCounter.ForModel(…)`, `TokenCounterFactory` | Default approximate counter — within a few percent of o200k_base on prose, Korean, code and JSON; a message counts its text, tool calls and results, reasoning and images (`ImageTokens` each). Other tokenizers differ (cl100k needs ~1.5x more for Korean); for a local model pass `ApproximateTokenCounter.ForModel(modelId)` — ratios fitted to Gemma's or Qwen's tokenizer (`LanguageRatios.Gemma` / `.Qwen`, which `TokenCounterFactory.Create(modelId)` also picks), where the defaults undercount JSON by a fifth to a quarter. The client also counts the request's tool definitions and, by default, scales its estimates by what the provider reports (`CalibrateTokenCounts`, `TokenEstimateFactor`). Register your own `ITokenCounter` before `AddIndexThinkingAgents()` to replace it |
 | Output-token boost and cap to the context window | `ThinkingChatClientOptions.ThinkingOutputMultiplier` (2, applied when reasoning is enabled), `MaxContextTokens` | Default on `GetResponseAsync` when the request sets `MaxOutputTokens` and a token counter is available (the cap); not applied to streams |
 | Budget / complexity reporting | `IBudgetTracker`, `IComplexityEstimator` | Default; informational only (see What It Does) |
-| Per-session thinking state | `IThinkingStateStore` | Opt-in: `AddIndexThinkingInMemoryStorage()`, `AddIndexThinkingDistributedStorage()` (needs an `IDistributedCache`), or `AddIndexThinkingSqliteStorage(connectionString)` from `IndexThinking.Sqlite` |
+| Per-session thinking state | `IThinkingStateStore` | Opt-in: `AddIndexThinkingInMemoryStorage()`, `AddIndexThinkingDistributedStorage()` (needs an `IDistributedCache`), or register your own `IThinkingStateStore` |
 | Store health check | `ThinkingStateStoreHealthCheck` | Opt-in: `AddIndexThinkingHealthChecks()`, then `services.AddHealthChecks().AddCheck<ThinkingStateStoreHealthCheck>("thinking-state-store")` |
 | Metrics (meter `IndexThinking`: `indexthinking.turns.total`, `.continuations.total`, `.truncations.total`, `.tokens.thinking`, `indexthinking.turn.duration`) | `IndexThinkingMeter` | Opt-in: `AddIndexThinkingMetrics()` — the DI `UseIndexThinking()` records every turn on it (or pass `meter:` to the `ThinkingChatClient` constructor) |
 
@@ -55,7 +55,6 @@ IndexThinking shapes **one model call** — it fits what goes in to the context 
 | Package | Use |
 |---|---|
 | `IndexThinking` | Turn handling, reasoning extraction, token counting, in-memory and distributed-cache state stores |
-| `IndexThinking.Sqlite` | Persistent SQLite `IThinkingStateStore` — `services.AddIndexThinkingSqliteStorage("Data Source=thinking.db")`. Carries `Microsoft.Data.Sqlite` and the native `e_sqlite3`; the core package does not |
 
 ## Quick Start
 

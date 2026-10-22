@@ -14,12 +14,6 @@
          resolving to vulnerable 9.0.4 (NU1903 / GHSA-73j8-2gch-69rq / CVE-2026-26127, Base64Url
          OOB-read DoS). Pin patched 10.0.8 (>=10.0.4) so the fix flows to IndexThinking consumers. -->
     <PackageVersion Include="Microsoft.Bcl.Memory" Version="10.0.13" />
-    <!-- Storage -->
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.13" />
-    <!-- Explicit lift: Microsoft.Data.Sqlite 10.0.8 pulls SQLitePCLRaw 2.1.11
-         (NU1903 high, GHSA-2m69-gcr7-jv3q); upstream 2.1.12 stable landed 2026-07-09.
-         Direct reference in IndexThinking so the >= 2.1.12 floor propagates to consumers. -->
-    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <!-- Distributed Caching -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.13" />

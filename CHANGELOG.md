@@ -6,6 +6,12 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 
 ## [Unreleased]
 
+### Removed
+- **Breaking: `IndexThinking.Sqlite` is no longer published** — `SqliteThinkingStateStore`, `SqliteStateStoreOptions` and
+  `AddIndexThinkingSqliteStorage` no longer exist; the last version stays on nuget.org, marked deprecated. Migration: register
+  `AddIndexThinkingInMemoryStorage()` or `AddIndexThinkingDistributedStorage()` (over any `IDistributedCache`, e.g. a SQL Server or
+  Redis cache for persistence), or your own `IThinkingStateStore`.
+
 ### Dependencies
 - .NET runtime packages 10.0.12 -> 10.0.13 (the 10.0 servicing band; `Microsoft.Extensions.*` and their siblings move together).
 
