@@ -13,6 +13,7 @@ breaking changes, and each one is marked **Breaking** with a migration note.
   Redis cache for persistence), or your own `IThinkingStateStore`.
 
 ### Dependencies
+- Anthropic SDK 12.60.0 -> 13.1.0 (test projects only; no published package references it).
 - .NET runtime packages 10.0.12 -> 10.0.13 (the 10.0 servicing band; `Microsoft.Extensions.*` and their siblings move together).
 
 ## [0.33.0] - 2026-10-19

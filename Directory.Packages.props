@@ -29,7 +29,7 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
     <PackageVersion Include="DotNetEnv" Version="3.2.0" />
     <!-- AI Providers for Simulation Tests -->
-    <PackageVersion Include="Anthropic" Version="12.60.0" />
+    <PackageVersion Include="Anthropic" Version="13.1.0" />
     <PackageVersion Include="GeminiDotnet.Extensions.AI" Version="0.25.0" />
     <!-- Testing (xUnit v3 / Microsoft.Testing.Platform) -->
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
