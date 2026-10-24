@@ -17,6 +17,7 @@ breaking changes, and each one is marked **Breaking** with a migration note.
 - `Microsoft.Extensions.AI` / `.Abstractions` / `.OpenAI` -> 10.11.0, `Microsoft.ML.Tokenizers` (+ data packages) 2.0.0 -> 2.0.1,
   `GeminiDotnet.Extensions.AI` 0.25.0 -> 0.27.0 (tests). Test tooling: xunit.v3 4.0.2, MTP HangDump/TrxReport 2.5.1.
 - .NET runtime packages 10.0.12 -> 10.0.13 (the 10.0 servicing band; `Microsoft.Extensions.*` and their siblings move together).
+- Anthropic SDK 13.1.0 -> 13.3.0 (tests).
 
 ## [0.33.0] - 2026-10-19
 
