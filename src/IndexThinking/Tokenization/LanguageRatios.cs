@@ -1,3 +1,5 @@
+using TokenEstimation;
+
 namespace IndexThinking.Tokenization;
 
 /// <summary>
@@ -17,44 +19,44 @@ public sealed record LanguageRatios
     /// <summary>
     /// Characters per token for Latin-script letters (whitespace, digits and punctuation are counted apart).
     /// </summary>
-    public double English { get; init; } = 7.0;
+    public double English { get; init; } = CharTokenRatios.O200k.Latin;
 
     /// <summary>
     /// Characters per token for Korean text (Hangul).
     /// </summary>
-    public double Korean { get; init; } = 1.35;
+    public double Korean { get; init; } = CharTokenRatios.O200k.Korean;
 
     /// <summary>
     /// Characters per token for Japanese text (Hiragana, Katakana, Kanji).
     /// </summary>
-    public double Japanese { get; init; } = 1.5;
+    public double Japanese { get; init; } = CharTokenRatios.O200k.Japanese;
 
     /// <summary>
     /// Characters per token for Chinese text (Hanzi).
     /// Chinese characters are often tokenized individually or in pairs.
     /// </summary>
-    public double Chinese { get; init; } = 1.2;
+    public double Chinese { get; init; } = CharTokenRatios.O200k.Chinese;
 
     /// <summary>
     /// Characters per token for decimal digits.
     /// </summary>
-    public double Digit { get; init; } = 1.3;
+    public double Digit { get; init; } = CharTokenRatios.O200k.Digit;
 
     /// <summary>
     /// Characters per token for punctuation and symbols (braces, quotes, operators) - the bulk of JSON and code.
     /// </summary>
-    public double Punctuation { get; init; } = 1.25;
+    public double Punctuation { get; init; } = CharTokenRatios.O200k.Punctuation;
 
     /// <summary>
     /// Whitespace runs per token: a run of spaces, tabs or newlines (an indentation, a line break) counts once, and a
     /// tokenizer merges most runs into a neighbouring token.
     /// </summary>
-    public double WhitespaceRun { get; init; } = 2.75;
+    public double WhitespaceRun { get; init; } = CharTokenRatios.O200k.WhitespaceRun;
 
     /// <summary>
     /// Characters per token for any other character (other scripts, emoji).
     /// </summary>
-    public double Default { get; init; } = 3.5;
+    public double Default { get; init; } = CharTokenRatios.O200k.Other;
 
     /// <summary>
     /// Gets the default ratios based on empirical tokenization data.
@@ -66,19 +68,13 @@ public sealed record LanguageRatios
     /// Korean/English prose, C# and JSON). It splits digits and punctuation finer than o200k_base: with the default ratios a
     /// JSON tool result is undercounted by about a quarter. Japanese and Chinese keep the defaults (not measured).
     /// </summary>
-    public static LanguageRatios Gemma { get; } = new()
-    {
-        English = 6.23, Korean = 1.46, Digit = 0.93, Punctuation = 0.91, WhitespaceRun = 3.80, Default = 3.86,
-    };
+    public static LanguageRatios Gemma { get; } = From(CharTokenRatios.Gemma);
 
     /// <summary>
     /// Ratios fitted to Qwen's tokenizer (Qwen 3.5, measured as for <see cref="Gemma"/>). With the default ratios a JSON tool
     /// result is undercounted by about a fifth. Japanese and Chinese keep the defaults (not measured).
     /// </summary>
-    public static LanguageRatios Qwen { get; } = new()
-    {
-        English = 6.84, Korean = 1.65, Digit = 0.93, Punctuation = 1.03, WhitespaceRun = 2.93, Default = 3.80,
-    };
+    public static LanguageRatios Qwen { get; } = From(CharTokenRatios.Qwen);
 
     /// <summary>
     /// The ratios for <paramref name="modelId"/>: <see cref="Gemma"/> or <see cref="Qwen"/> when the id names that family
@@ -95,6 +91,15 @@ public sealed record LanguageRatios
             return Qwen;
         return DefaultRatios;
     }
+
+    private static LanguageRatios From(CharTokenRatios t) => new()
+    {
+        English = t.Latin, Korean = t.Korean, Japanese = t.Japanese, Chinese = t.Chinese,
+        Digit = t.Digit, Punctuation = t.Punctuation, WhitespaceRun = t.WhitespaceRun, Default = t.Other,
+    };
+
+    internal CharTokenRatios ToTable() =>
+        new(English, Korean, Japanese, Chinese, Digit, Punctuation, WhitespaceRun, Default);
 
     /// <summary>
     /// Gets the ratio for a detected language.
