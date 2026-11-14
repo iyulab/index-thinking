@@ -6,6 +6,7 @@ on:
     paths:
       - '**/*.props'
       - '**/*.targets'
+      - 'global.json'
       - 'src/**'
       - 'tests/**'
       - 'samples/**'
